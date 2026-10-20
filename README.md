@@ -1,4 +1,4 @@
-# Screenalyze 📸 🤖
+# Screenalyze
 
 **Screenalyze** is a mobile application that listens for screenshots in the background, analyses captured content (such as YouTube video tutorials, system design slides, architecture diagrams, and code snippets), generates insightful AI summaries, and triggers interactive notifications, action prompts and appended workflow asking: **"What would you like to do with this screenshot?"**
 
