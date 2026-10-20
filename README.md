@@ -1,6 +1,6 @@
 # Screenalyze 📸 🤖
 
-**Screenalyze** is a React Native & Expo mobile application that listens for screenshots in real-time, analyzes captured content (such as YouTube video tutorials, system design slides, architecture diagrams, and code snippets), generates insightful AI summaries, and triggers interactive notifications and action prompts asking: **"What would you like to do with this screenshot?"**
+**Screenalyze** is a mobile application that listens for screenshots in the background, analyses captured content (such as YouTube video tutorials, system design slides, architecture diagrams, and code snippets), generates insightful AI summaries, and triggers interactive notifications, action prompts and appended workflow asking: **"What would you like to do with this screenshot?"**
 
 An application that analyzes screenshots captured in the background to interpret visual content and context. It generates concise summaries of the visual information and provides workflow suggestions based on that context. The software transforms information within screenshots into understandable overviews and actionable guidance to help users identify relevant next steps and ways to organize their work. Core functionality includes background screenshot analysis, contextual summarization, and the generation of workflow recommendations derived from the analyzed content.
 
