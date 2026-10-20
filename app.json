@@ -5,21 +5,64 @@
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
-    "userInterfaceStyle": "light",
+    "userInterfaceStyle": "dark",
+    "backgroundColor": "#090D16",
+    "scheme": "screenalyze",
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "backgroundColor": "#090D16",
+      "infoPlist": {
+        "NSPhotoLibraryUsageDescription": "Screenalyze needs access to your photo library to detect and analyze your recent screenshots.",
+        "NSPhotoLibraryAddUsageDescription": "Screenalyze saves and analyzes screenshots.",
+        "NSFaceIDUsageDescription": "Allow Screenalyze to use Face ID for fast and secure access."
+      }
     },
     "android": {
+      "backgroundColor": "#090D16",
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/android-icon-foreground.png",
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
+      "permissions": [
+        "READ_MEDIA_IMAGES",
+        "POST_NOTIFICATIONS"
+      ],
       "predictiveBackGestureEnabled": false
     },
     "web": {
       "favicon": "./assets/favicon.png"
-    }
+    },
+    "experiments": {
+      "typedRoutes": true
+    },
+    "plugins": [
+      "expo-router",
+      "expo-status-bar",
+      "expo-image",
+      "expo-sharing",
+      [
+        "expo-media-library",
+        {
+          "photosPermission": "Allow Screenalyze to access your screenshots to provide automatic analysis and actionable suggestions.",
+          "savePhotosPermission": "Allow Screenalyze to save images.",
+          "isAccessMediaLocationEnabled": false
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/icon.png",
+          "color": "#6366F1"
+        }
+      ],
+      [
+        "expo-local-authentication",
+        {
+          "faceIDPermission": "Allow Screenalyze to use Face ID for fast and secure access."
+        }
+      ]
+    ]
   }
 }
