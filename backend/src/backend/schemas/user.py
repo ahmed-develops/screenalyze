@@ -16,6 +16,7 @@ class UserProfile(BaseModel):
     cloud_sync: bool = True
     biometric_lock: bool = True
     telemetry_enabled: bool = False
+    is_registered: bool = False
 
 class UserProfileUpdate(BaseModel):
     name: Optional[str] = None
@@ -28,6 +29,8 @@ class UserProfileUpdate(BaseModel):
     cloud_sync: Optional[bool] = None
     biometric_lock: Optional[bool] = None
     telemetry_enabled: Optional[bool] = None
+    is_registered: Optional[bool] = None
+
 
 class AppSettings(BaseModel):
     auto_analyze_screenshots: bool = True

@@ -36,6 +36,7 @@ export default function LoginScreen() {
   const [isLoading, setIsLoading] = useState(false);
   const [biometricStatus, setBiometricStatus] = useState<BiometricStatus | null>(null);
   const [isBiometricLoading, setIsBiometricLoading] = useState(false);
+  const [linkedBiometricEmail, setLinkedBiometricEmail] = useState<string | null>(null);
 
   useEffect(() => {
     Keyboard.dismiss();
@@ -44,9 +45,12 @@ export default function LoginScreen() {
         const status = await BiometricService.checkBiometricStatus();
         setBiometricStatus(status);
 
-        const linked = await StorageService.getBiometricLinkedEmail();
-        if (linked) {
-          setEmail(linked);
+        // Strict: ONLY show Face ID if an account on this device explicitly confirmed and enabled Face ID
+        const { ready, email: confirmedEmail } = await StorageService.isBiometricReadyForLogin();
+        if (ready && confirmedEmail) {
+          setLinkedBiometricEmail(confirmedEmail);
+        } else {
+          setLinkedBiometricEmail(null);
         }
       } catch (err) {
         console.warn('Failed initializing login biometrics', err);
@@ -55,30 +59,49 @@ export default function LoginScreen() {
   }, []);
 
   const handleFaceIdLogin = async () => {
+    if (!linkedBiometricEmail) {
+      Alert.alert(
+        'Face ID Not Configured',
+        'Please sign in with your email and verification code first. You can enable Face ID after verifying your account.'
+      );
+      return;
+    }
+
     setIsBiometricLoading(true);
     try {
-      const linked = await StorageService.getBiometricLinkedEmail();
-      const targetEmail = (email.trim() || linked || 'muhammad.ahmed31612@gmail.com').toLowerCase();
+      const targetEmail = linkedBiometricEmail;
 
       const success = await BiometricService.authenticate(`Sign in with Face ID for ${targetEmail}`);
-      setIsBiometricLoading(false);
-
-      if (success) {
-        let token = await StorageService.getBiometricToken(targetEmail);
-        if (!token) {
-          const session = await StorageService.getAuthSession();
-          if (session?.token) token = session.token;
-        }
-        if (!token && targetEmail === 'muhammad.ahmed31612@gmail.com') {
-          token = 'test-biometric-jwt-token-muhammad-ahmed';
-        }
-        if (token) {
-          await StorageService.saveAuthSession(token, targetEmail);
-          await StorageService.setBiometricLinkedEmail(targetEmail);
-          await StorageService.setBiometricLockEnabled(true, targetEmail);
-        }
-        router.replace('/(tabs)');
+      if (!success) {
+        setIsBiometricLoading(false);
+        return;
       }
+
+      // 1. Obtain a fresh, valid session token from backend for this verified biometric identity
+      let sessionToken: string | null = null;
+      try {
+        const authRes = await ApiClient.biometricLogin(targetEmail);
+        if (authRes.token) {
+          sessionToken = authRes.token;
+          await StorageService.saveBiometricToken(targetEmail, authRes.token);
+        }
+        if (authRes.user) {
+          await StorageService.saveUserProfile(authRes.user, targetEmail);
+        }
+      } catch (backendErr) {
+        console.warn('Backend biometric login fallback:', backendErr);
+        // Offline fallback
+        sessionToken = await StorageService.getBiometricToken(targetEmail);
+      }
+
+      if (sessionToken) {
+        await StorageService.saveAuthSession(sessionToken, targetEmail);
+      }
+      await StorageService.setBiometricLinkedEmail(targetEmail);
+      await StorageService.setBiometricLockEnabled(true, targetEmail);
+
+      setIsBiometricLoading(false);
+      router.replace('/(tabs)');
     } catch (err) {
       setIsBiometricLoading(false);
       console.warn('Face ID login failed', err);
@@ -246,8 +269,8 @@ export default function LoginScreen() {
               </LinearGradient>
             </TouchableOpacity>
 
-            {/* Fast Sign In with Face ID Button */}
-            {biometricStatus?.isSupported && (
+            {/* Fast Sign In with Face ID Button - ONLY shown if user has confirmed Face ID for their account */}
+            {Boolean(linkedBiometricEmail && biometricStatus?.isSupported) && (
               <TouchableOpacity
                 activeOpacity={0.8}
                 style={styles.biometricBtn}

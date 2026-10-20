@@ -2,6 +2,37 @@ export interface FormattedAnalysisError {
   title: string;
   message: string;
   isServerOffline: boolean;
+  isInappropriate?: boolean;
+  category?: string;
+  imageUri?: string;
+}
+
+/**
+ * Transforms an inappropriate or non-actionable classification into a graceful, helpful error message.
+ */
+export function getInappropriateScreenshotError(
+  category?: string,
+  reason?: string,
+  imageUri?: string
+): FormattedAnalysisError {
+  const rawCat = (category || 'personal-photo').toLowerCase().trim();
+  const readableCategory = rawCat
+    .replace(/-/g, ' ')
+    .replace(/\b\w/g, (c) => c.toUpperCase());
+
+  const explanation =
+    reason && reason.trim().length > 10
+      ? reason.trim()
+      : `Identified as ${readableCategory}. Screenalyze focuses exclusively on technical content, code snippets, architecture diagrams, UI designs, and tutorials.`;
+
+  return {
+    title: 'Screenshot Filtered',
+    message: explanation,
+    isServerOffline: false,
+    isInappropriate: true,
+    category: readableCategory,
+    imageUri,
+  };
 }
 
 /**

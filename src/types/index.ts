@@ -144,5 +144,6 @@ export interface UserProfile {
   cloudSync: boolean;
   biometricLock: boolean;
   telemetryEnabled: boolean;
+  isRegistered?: boolean;
 }
 

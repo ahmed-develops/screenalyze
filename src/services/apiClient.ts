@@ -58,6 +58,7 @@ export interface BackendAuthResponse {
   success: boolean;
   token: string;
   user: UserProfile;
+  is_new_user?: boolean;
 }
 
 export const ApiClient = {
@@ -292,6 +293,7 @@ export const ApiClient = {
       cloudSync: data.cloud_sync,
       biometricLock: data.biometric_lock,
       telemetryEnabled: data.telemetry_enabled,
+      isRegistered: Boolean(data.is_registered === true),
     };
   },
 
@@ -308,6 +310,7 @@ export const ApiClient = {
     if (updates.cloudSync !== undefined) body.cloud_sync = updates.cloudSync;
     if (updates.biometricLock !== undefined) body.biometric_lock = updates.biometricLock;
     if (updates.telemetryEnabled !== undefined) body.telemetry_enabled = updates.telemetryEnabled;
+    if (updates.isRegistered !== undefined) body.is_registered = updates.isRegistered;
 
     const res = await fetch(url, {
       method: 'PUT',
@@ -334,6 +337,7 @@ export const ApiClient = {
       cloudSync: data.cloud_sync,
       biometricLock: data.biometric_lock,
       telemetryEnabled: data.telemetry_enabled,
+      isRegistered: data.is_registered ?? true,
     };
   },
 
@@ -427,11 +431,35 @@ export const ApiClient = {
       const err = await res.text();
       throw new Error(`Invalid authentication code: ${err}`);
     }
-    const data: BackendAuthResponse = await res.json();
-    if (data.token) {
-      this.setAuthToken(data.token);
+    const rawData = await res.json();
+    const u = rawData.user || {};
+    if (rawData.token) {
+      this.setAuthToken(rawData.token);
     }
-    return data;
+    const isNewUser = Boolean(rawData.is_new_user);
+    const isRegistered = !isNewUser && Boolean(u.is_registered === true);
+    return {
+      success: rawData.success,
+      token: rawData.token,
+      is_new_user: isNewUser,
+      user: {
+        name: u.name,
+        email: u.email,
+        role: u.role,
+        company: u.company,
+        avatarUri: u.avatar_uri,
+        plan: u.plan,
+        planName: u.plan_name,
+        memberSince: u.member_since,
+        totalCaptures: u.total_captures,
+        totalTutorials: u.total_tutorials,
+        accuracyRate: u.accuracy_rate,
+        cloudSync: u.cloud_sync,
+        biometricLock: u.biometric_lock,
+        telemetryEnabled: u.telemetry_enabled,
+        isRegistered,
+      },
+    };
   },
 
   async getMe(): Promise<UserProfile> {
@@ -460,6 +488,45 @@ export const ApiClient = {
       cloudSync: u.cloud_sync,
       biometricLock: u.biometric_lock,
       telemetryEnabled: u.telemetry_enabled,
+    };
+  },
+
+  async biometricLogin(email: string): Promise<BackendAuthResponse> {
+    const url = `${this.baseUrl}/api/v1/auth/biometric-login`;
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: email.trim().toLowerCase() }),
+    });
+    if (!res.ok) {
+      const errData = await res.json().catch(() => ({}));
+      throw new Error(errData.detail || `Biometric login failed: HTTP ${res.status}`);
+    }
+    const data = await res.json();
+    const u = data.user;
+    if (data.token) {
+      this.setAuthToken(data.token);
+    }
+    return {
+      success: data.success,
+      token: data.token,
+      user: {
+        name: u.name,
+        email: u.email,
+        role: u.role,
+        company: u.company,
+        avatarUri: u.avatar_uri,
+        plan: u.plan,
+        planName: u.plan_name,
+        memberSince: u.member_since,
+        totalCaptures: u.total_captures,
+        totalTutorials: u.total_tutorials,
+        accuracyRate: u.accuracy_rate,
+        cloudSync: u.cloud_sync,
+        biometricLock: u.biometric_lock,
+        telemetryEnabled: u.telemetry_enabled,
+        isRegistered: Boolean(u.is_registered === true),
+      },
     };
   },
 

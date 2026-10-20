@@ -117,7 +117,8 @@ class AuthService:
                 token = f"scr_sess_{secrets.token_urlsafe(32)}"
                 await self._persist_session(token, cleaned_email, now_dt, now)
                 profile = await user_service.get_or_create_user(cleaned_email)
-                return OTPVerifyResponse(success=True, token=token, user=profile)
+                is_new = not profile.is_registered
+                return OTPVerifyResponse(success=True, token=token, user=profile, is_new_user=is_new)
             raise ValueError("No active verification code found for this email. Please request a new code.")
 
         # Check expiration
@@ -163,12 +164,28 @@ class AuthService:
 
         # Retrieve or initialize user profile for this verified email
         profile = await user_service.get_or_create_user(cleaned_email)
+        is_new = not profile.is_registered
 
         return OTPVerifyResponse(
             success=True,
             token=token,
             user=profile,
+            is_new_user=is_new,
         )
+
+    async def create_biometric_session(self, email: str) -> OTPVerifyResponse:
+        cleaned_email = email.strip().lower()
+        now_dt = datetime.now(timezone.utc)
+        now = time.time()
+        token = f"scr_sess_{secrets.token_urlsafe(32)}"
+        await self._persist_session(token, cleaned_email, now_dt, now)
+        profile = await user_service.get_or_create_user(cleaned_email)
+        return OTPVerifyResponse(
+            success=True,
+            token=token,
+            user=profile,
+        )
+
 
     async def _persist_session(self, token: str, email: str, now_dt: datetime, now_ts: float) -> None:
         expires_at_dt = now_dt + timedelta(days=30)

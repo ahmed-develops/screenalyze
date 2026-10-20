@@ -18,7 +18,13 @@ class OTPVerifyResponse(BaseModel):
     success: bool
     token: str
     user: UserProfile
+    is_new_user: bool = False
+
 
 class SessionUserResponse(BaseModel):
     user: UserProfile
     authenticated: bool = True
+
+class BiometricLoginRequest(BaseModel):
+    email: str
+

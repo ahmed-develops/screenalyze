@@ -8,6 +8,7 @@ import { NotificationService } from '../services/notificationService';
 import { AppThemeProvider, useTheme } from '../theme/ThemeContext';
 import { StorageService } from '../services/storageService';
 import { BiometricService } from '../services/biometricService';
+import { ApiClient } from '../services/apiClient';
 import { StitchTheme } from '../theme/stitchTheme';
 
 function NavigationRoot() {
@@ -56,6 +57,22 @@ function NavigationRoot() {
             }
           }
 
+          // Check if this account has completed registration
+          const isRegistered = await StorageService.isUserRegistered(session.email);
+          if (!isRegistered) {
+            console.log(
+              `[AuthGate] User ${session.email} has active session but is not registered. Redirecting to registration.`
+            );
+            if (isSubscribed) {
+              setIsAuthReady(true);
+              router.replace({
+                pathname: '/auth/register',
+                params: { email: session.email },
+              });
+            }
+            return;
+          }
+
           if (isSubscribed) {
             setIsAuthReady(true);
           }
@@ -74,7 +91,18 @@ function NavigationRoot() {
                 `Sign in with ${status.label}`
               );
               if (unlocked) {
-                await StorageService.saveAuthSession(savedToken, linkedEmail);
+                try {
+                  const authRes = await ApiClient.biometricLogin(linkedEmail);
+                  if (authRes.token) {
+                    await StorageService.saveAuthSession(authRes.token, linkedEmail);
+                    await StorageService.saveBiometricToken(linkedEmail, authRes.token);
+                  }
+                  if (authRes.user) {
+                    await StorageService.saveUserProfile(authRes.user, linkedEmail);
+                  }
+                } catch {
+                  await StorageService.saveAuthSession(savedToken, linkedEmail);
+                }
                 if (isSubscribed) {
                   setIsAuthReady(true);
                   router.replace('/(tabs)');
@@ -235,6 +263,13 @@ function NavigationRoot() {
         />
         <Stack.Screen
           name="auth/verify-otp"
+          options={{
+            headerShown: false,
+            animation: 'slide_from_right',
+          }}
+        />
+        <Stack.Screen
+          name="auth/register"
           options={{
             headerShown: false,
             animation: 'slide_from_right',

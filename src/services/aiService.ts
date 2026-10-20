@@ -2,7 +2,7 @@ import * as FileSystem from 'expo-file-system/legacy';
 import * as LegacyMediaLibrary from 'expo-media-library/legacy';
 import { ScreenshotAnalysis, ScreenshotCategorization } from '../types';
 import { ApiClient } from './apiClient';
-import { computeSha256, cleanBase64 } from '../utils/crypto';
+import { computeFastImageHash } from '../utils/crypto';
 
 export interface ExecuteActionResult {
   title: string;
@@ -77,7 +77,7 @@ export const AIService = {
 
     const res = await ApiClient.classifyScreenshot(base64Data);
     if (!res.imageHash) {
-      res.imageHash = computeSha256(cleanBase64(base64Data));
+      res.imageHash = computeFastImageHash(base64Data);
     }
     return res;
   },
@@ -97,11 +97,10 @@ export const AIService = {
       throw new Error('Unable to read image data from screenshot.');
     }
 
-    const localHash = computeSha256(cleanBase64(base64Data));
     const result = await ApiClient.analyzeScreenshot(base64Data, customInstruction, forceReanalyze);
     return {
       ...result,
-      imageHash: result.imageHash || localHash,
+      imageHash: result.imageHash || computeFastImageHash(base64Data),
     };
   },
 

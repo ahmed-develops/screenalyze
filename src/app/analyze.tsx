@@ -10,7 +10,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Sparkles, ArrowLeft, RefreshCw, AlertCircle, X } from 'lucide-react-native';
+import { Sparkles, ArrowLeft, RefreshCw, AlertCircle, X, ShieldAlert } from 'lucide-react-native';
 import { MediaService } from '../services/mediaService';
 import { AIService } from '../services/aiService';
 import { StorageService } from '../services/storageService';
@@ -18,15 +18,16 @@ import { NotificationService } from '../services/notificationService';
 import { ScreenshotAnalysis, isAppropriateScreenshot, isAppropriateCategory } from '../types';
 import { StitchTheme } from '../theme/stitchTheme';
 import { useTheme } from '../theme/ThemeContext';
-import { getFriendlyAnalysisError } from '../utils/errorUtils';
+import { getFriendlyAnalysisError, getInappropriateScreenshotError } from '../utils/errorUtils';
 
-import { computeSha256, cleanBase64 } from '../utils/crypto';
+import { computeFastImageHash } from '../utils/crypto';
 
 export default function AutoAnalyzeScreen() {
   const { colors, isDark } = useTheme();
   const [status, setStatus] = useState<string>('Detecting latest screenshot...');
   const [error, setError] = useState<string | null>(null);
   const [errorTitle, setErrorTitle] = useState<string | null>(null);
+  const [isInappropriate, setIsInappropriate] = useState(false);
   const [isProcessing, setIsProcessing] = useState(true);
   const attemptsRef = useRef(0);
 
@@ -34,6 +35,7 @@ export default function AutoAnalyzeScreen() {
     setIsProcessing(true);
     setError(null);
     setErrorTitle(null);
+    setIsInappropriate(false);
     setStatus('Detecting latest screenshot...');
 
     try {
@@ -70,9 +72,9 @@ export default function AutoAnalyzeScreen() {
         return;
       }
 
-      // 2. Fast Deduplication Check by Content Hash (SHA-256)
+      // 2. Fast Deduplication Check by Content Fingerprint
       const base64Data = await AIService.getImageBase64(latest.uri);
-      const imgHash = base64Data ? computeSha256(cleanBase64(base64Data)) : undefined;
+      const imgHash = base64Data ? computeFastImageHash(base64Data) : undefined;
 
       if (imgHash) {
         const existingByHash = await StorageService.findExistingScreenshot({ imageHash: imgHash });
@@ -94,7 +96,14 @@ export default function AutoAnalyzeScreen() {
         });
 
         if (isIgnored) {
-          setError('Photo skipped: previously identified as personal/non-actionable.');
+          const errInfo = getInappropriateScreenshotError(
+            'Personal or Non-Actionable',
+            'This image was previously evaluated and identified as personal or non-actionable.',
+            latest.uri
+          );
+          setError(errInfo.message);
+          setErrorTitle(errInfo.title);
+          setIsInappropriate(true);
           setIsProcessing(false);
           return;
         }
@@ -105,7 +114,14 @@ export default function AutoAnalyzeScreen() {
         const categorization = await AIService.classifyScreenshot(latest.uri, base64Data);
 
         if (!categorization.isWorthAnalyzing || !isAppropriateCategory(categorization.category)) {
-          setError(`Skipped (${categorization.category}): ${categorization.reason}`);
+          const errInfo = getInappropriateScreenshotError(
+            categorization.category,
+            categorization.reason,
+            latest.uri
+          );
+          setError(errInfo.message);
+          setErrorTitle(errInfo.title);
+          setIsInappropriate(true);
           setIsProcessing(false);
           await StorageService.addIgnoredAssetId(latest.id);
           if (imgHash) {
@@ -133,7 +149,14 @@ export default function AutoAnalyzeScreen() {
       };
 
       if (!isAppropriateScreenshot(analysisItem)) {
-        setError(`Skipped (${analysisItem.category}): Screenshot is not appropriate for knowledge analysis.`);
+        const errInfo = getInappropriateScreenshotError(
+          analysisItem.category,
+          analysisItem.summary,
+          latest.uri
+        );
+        setError(errInfo.message);
+        setErrorTitle(errInfo.title);
+        setIsInappropriate(true);
         setIsProcessing(false);
         await StorageService.addIgnoredAssetId(latest.id);
         if (imgHash) {
@@ -235,16 +258,22 @@ export default function AutoAnalyzeScreen() {
                 style={[
                   styles.iconCircle,
                   {
-                    backgroundColor: error
-                      ? 'rgba(239, 68, 68, 0.15)'
-                      : 'rgba(99, 102, 241, 0.15)',
-                    borderColor: error
-                      ? 'rgba(239, 68, 68, 0.3)'
-                      : 'rgba(99, 102, 241, 0.3)',
+                    backgroundColor: isInappropriate
+                      ? 'rgba(245, 158, 11, 0.15)'
+                      : error
+                        ? 'rgba(239, 68, 68, 0.15)'
+                        : 'rgba(99, 102, 241, 0.15)',
+                    borderColor: isInappropriate
+                      ? 'rgba(245, 158, 11, 0.35)'
+                      : error
+                        ? 'rgba(239, 68, 68, 0.3)'
+                        : 'rgba(99, 102, 241, 0.3)',
                   },
                 ]}
               >
-                {error ? (
+                {isInappropriate ? (
+                  <ShieldAlert size={32} color="#F59E0B" />
+                ) : error ? (
                   <AlertCircle size={32} color={colors.danger} />
                 ) : (
                   <Sparkles size={32} color={colors.primary} />
@@ -252,7 +281,7 @@ export default function AutoAnalyzeScreen() {
               </View>
 
               <Text style={[styles.title, { color: colors.textPrimary }]}>
-                {error ? (errorTitle || 'Analysis Interrupted') : 'Instant Auto-Capture'}
+                {error ? (errorTitle || (isInappropriate ? 'Screenshot Filtered' : 'Analysis Interrupted')) : 'Instant Auto-Capture'}
               </Text>
 
               <Text style={[styles.statusText, { color: colors.textSecondary }]}>
@@ -270,23 +299,27 @@ export default function AutoAnalyzeScreen() {
 
               {error && (
                 <View style={styles.actionsRow}>
-                  <TouchableOpacity
-                    style={[styles.btn, styles.retryBtn, { backgroundColor: colors.primary }]}
-                    onPress={() => {
-                      attemptsRef.current = 0;
-                      performAutoAnalysis();
-                    }}
-                    activeOpacity={0.8}
-                  >
-                    <RefreshCw size={15} color="#FFFFFF" />
-                    <Text style={styles.btnTextWhite}>Try Again</Text>
-                  </TouchableOpacity>
+                  {!isInappropriate && (
+                    <TouchableOpacity
+                      style={[styles.btn, styles.retryBtn, { backgroundColor: colors.primary }]}
+                      onPress={() => {
+                        attemptsRef.current = 0;
+                        performAutoAnalysis();
+                      }}
+                      activeOpacity={0.8}
+                    >
+                      <RefreshCw size={15} color="#FFFFFF" />
+                      <Text style={styles.btnTextWhite}>Try Again</Text>
+                    </TouchableOpacity>
+                  )}
 
                   <TouchableOpacity
                     style={[
                       styles.btn,
-                      styles.homeBtn,
-                      {
+                      isInappropriate
+                        ? [styles.retryBtn, { backgroundColor: colors.primary }]
+                        : styles.homeBtn,
+                      !isInappropriate && {
                         backgroundColor: isDark
                           ? 'rgba(255, 255, 255, 0.08)'
                           : colors.surfaceSubtle,
@@ -296,9 +329,18 @@ export default function AutoAnalyzeScreen() {
                     onPress={() => router.replace('/(tabs)')}
                     activeOpacity={0.8}
                   >
-                    <X size={15} color={colors.textPrimary} />
-                    <Text style={[styles.btnText, { color: colors.textPrimary }]}>
-                      Close
+                    {isInappropriate ? (
+                      <ArrowLeft size={15} color="#FFFFFF" />
+                    ) : (
+                      <X size={15} color={colors.textPrimary} />
+                    )}
+                    <Text
+                      style={[
+                        isInappropriate ? styles.btnTextWhite : styles.btnText,
+                        !isInappropriate && { color: colors.textPrimary },
+                      ]}
+                    >
+                      {isInappropriate ? 'Return to Home' : 'Close'}
                     </Text>
                   </TouchableOpacity>
                 </View>

@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Animated, ActivityIndicator } from 'react-native';
 import { Image } from 'expo-image';
-import { Sparkles, X, Zap, AlertTriangle } from 'lucide-react-native';
+import { Sparkles, X, Zap, AlertTriangle, ShieldAlert } from 'lucide-react-native';
 import { ScreenshotAnalysis, isAppropriateScreenshot } from '../types';
 import { Colors } from '../theme/colors';
 
@@ -17,6 +17,9 @@ export interface BannerError {
   title: string;
   message: string;
   isServerOffline?: boolean;
+  isInappropriate?: boolean;
+  category?: string;
+  imageUri?: string;
 }
 
 interface NotificationBannerProps {
@@ -38,6 +41,7 @@ export const NotificationBanner: React.FC<NotificationBannerProps> = ({
   const isAppropriate = isAppropriateScreenshot(item);
   const activeItem = isAppropriate ? item : null;
   const isError = Boolean(error);
+  const isInappropriate = Boolean(error?.isInappropriate);
   const isVisible = Boolean(activeItem || pendingItem || isError);
 
   useEffect(() => {
@@ -57,12 +61,12 @@ export const NotificationBanner: React.FC<NotificationBannerProps> = ({
     }
   }, [isVisible, slideAnim]);
 
-  // Auto-dismiss error banner after 6 seconds so user isn't stuck with it
+  // Auto-dismiss error banner after 7 seconds so user isn't stuck with it
   useEffect(() => {
     if (isError) {
       const timer = setTimeout(() => {
         onDismiss();
-      }, 6000);
+      }, 7000);
       return () => clearTimeout(timer);
     }
   }, [isError, onDismiss]);
@@ -71,12 +75,14 @@ export const NotificationBanner: React.FC<NotificationBannerProps> = ({
 
   const isPending = Boolean(pendingItem && !activeItem && !isError);
   const isBatch = Boolean(pendingItem?.totalCount && pendingItem.totalCount > 1);
-  const displayImageUri = activeItem?.imageUri || pendingItem?.uri;
+  const displayImageUri = activeItem?.imageUri || pendingItem?.uri || error?.imageUri;
 
   const badgeText = isError
-    ? error?.isServerOffline
-      ? 'SERVER OFFLINE'
-      : 'ANALYSIS ERROR'
+    ? isInappropriate
+      ? `CONTENT FILTERED • ${error?.category ? error.category.toUpperCase() : 'NOT ACTIONABLE'}`
+      : error?.isServerOffline
+        ? 'SERVER OFFLINE'
+        : 'ANALYSIS ERROR'
     : isPending
       ? isBatch
         ? `ANALYZING SCREENSHOTS (${pendingItem?.currentIndex || 1}/${pendingItem?.totalCount})...`
@@ -84,7 +90,7 @@ export const NotificationBanner: React.FC<NotificationBannerProps> = ({
       : 'SUMMARY READY';
 
   const titleText = isError
-    ? error?.title || 'Server is off'
+    ? error?.title || (isInappropriate ? 'Screenshot Skipped' : 'Server is off')
     : isPending
       ? isBatch
         ? `Analyzing ${pendingItem?.totalCount} screenshots...`
@@ -98,10 +104,10 @@ export const NotificationBanner: React.FC<NotificationBannerProps> = ({
       : 'Summary complete! Tap to view actions & code →';
 
   const handleCardPress = () => {
-    if (isError) {
-      onDismiss();
-    } else if (onPress) {
+    if (onPress) {
       onPress();
+    } else if (isError) {
+      onDismiss();
     }
   };
 
@@ -111,7 +117,7 @@ export const NotificationBanner: React.FC<NotificationBannerProps> = ({
         style={[
           styles.card,
           isPending && styles.cardPending,
-          isError && styles.cardError,
+          isError && (isInappropriate ? styles.cardInappropriate : styles.cardError),
         ]}
         activeOpacity={0.9}
         onPress={handleCardPress}
@@ -122,14 +128,14 @@ export const NotificationBanner: React.FC<NotificationBannerProps> = ({
               style={[
                 styles.pulseDot,
                 isPending && styles.pulseDotPending,
-                isError && styles.pulseDotError,
+                isError && (isInappropriate ? styles.pulseDotInappropriate : styles.pulseDotError),
               ]}
             />
             <Text
               style={[
                 styles.badgeText,
                 isPending && styles.badgeTextPending,
-                isError && styles.badgeTextError,
+                isError && (isInappropriate ? styles.badgeTextInappropriate : styles.badgeTextError),
               ]}
             >
               {badgeText}
@@ -143,21 +149,32 @@ export const NotificationBanner: React.FC<NotificationBannerProps> = ({
               onDismiss();
             }}
           >
-            <X size={15} color={isError ? '#F87171' : Colors.textMuted} />
+            <X size={15} color={isInappropriate ? '#FBBF24' : isError ? '#F87171' : Colors.textMuted} />
           </TouchableOpacity>
         </View>
 
         <View style={styles.contentRow}>
-          {isError ? (
-            <View style={[styles.thumbnail, styles.thumbnailError]}>
-              <AlertTriangle size={20} color="#EF4444" />
+          {displayImageUri ? (
+            <View style={styles.thumbnailWrapper}>
+              <Image
+                source={{ uri: displayImageUri }}
+                style={styles.thumbnail}
+                contentFit="cover"
+              />
+              {isInappropriate && (
+                <View style={styles.thumbnailFilterBadge}>
+                  <ShieldAlert size={12} color="#F59E0B" />
+                </View>
+              )}
             </View>
-          ) : displayImageUri ? (
-            <Image
-              source={{ uri: displayImageUri }}
-              style={styles.thumbnail}
-              contentFit="cover"
-            />
+          ) : isError ? (
+            <View style={[styles.thumbnail, isInappropriate ? styles.thumbnailInappropriate : styles.thumbnailError]}>
+              {isInappropriate ? (
+                <ShieldAlert size={20} color="#F59E0B" />
+              ) : (
+                <AlertTriangle size={20} color="#EF4444" />
+              )}
+            </View>
           ) : (
             <View style={[styles.thumbnail, styles.thumbnailPlaceholder]}>
               <Zap size={20} color={Colors.primaryLight} />
@@ -172,7 +189,7 @@ export const NotificationBanner: React.FC<NotificationBannerProps> = ({
               style={[
                 styles.promptQuestion,
                 isPending && styles.promptPending,
-                isError && styles.promptError,
+                isError && (isInappropriate ? styles.promptInappropriate : styles.promptError),
               ]}
               numberOfLines={2}
             >
@@ -184,11 +201,13 @@ export const NotificationBanner: React.FC<NotificationBannerProps> = ({
             style={[
               styles.actionPill,
               isPending && styles.actionPillPending,
-              isError && styles.actionPillError,
+              isError && (isInappropriate ? styles.actionPillInappropriate : styles.actionPillError),
             ]}
           >
             {isPending ? (
               <ActivityIndicator size="small" color="#0099FF" />
+            ) : isInappropriate ? (
+              <ShieldAlert size={16} color="#F59E0B" />
             ) : isError ? (
               <X size={15} color="#EF4444" />
             ) : (
@@ -200,6 +219,7 @@ export const NotificationBanner: React.FC<NotificationBannerProps> = ({
     </Animated.View>
   );
 };
+
 
 const styles = StyleSheet.create({
   container: {
@@ -228,6 +248,10 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(32, 17, 21, 0.96)',
     borderColor: 'rgba(239, 68, 68, 0.55)',
   },
+  cardInappropriate: {
+    backgroundColor: 'rgba(28, 22, 14, 0.96)',
+    borderColor: 'rgba(245, 158, 11, 0.55)',
+  },
   topRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -251,6 +275,9 @@ const styles = StyleSheet.create({
   pulseDotError: {
     backgroundColor: '#EF4444',
   },
+  pulseDotInappropriate: {
+    backgroundColor: '#F59E0B',
+  },
   badgeText: {
     fontSize: 10,
     fontWeight: '800',
@@ -263,6 +290,9 @@ const styles = StyleSheet.create({
   badgeTextError: {
     color: '#EF4444',
   },
+  badgeTextInappropriate: {
+    color: '#F59E0B',
+  },
   closeBtn: {
     padding: 2,
   },
@@ -270,6 +300,19 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
+  },
+  thumbnailWrapper: {
+    position: 'relative',
+  },
+  thumbnailFilterBadge: {
+    position: 'absolute',
+    bottom: -3,
+    right: -3,
+    backgroundColor: 'rgba(28, 22, 14, 0.9)',
+    borderRadius: 10,
+    padding: 2,
+    borderWidth: 1,
+    borderColor: 'rgba(245, 158, 11, 0.6)',
   },
   thumbnail: {
     width: 44,
@@ -288,6 +331,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: 'rgba(239, 68, 68, 0.12)',
     borderColor: 'rgba(239, 68, 68, 0.3)',
+  },
+  thumbnailInappropriate: {
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(245, 158, 11, 0.12)',
+    borderColor: 'rgba(245, 158, 11, 0.4)',
   },
   textColumn: {
     flex: 1,
@@ -310,6 +359,9 @@ const styles = StyleSheet.create({
   promptError: {
     color: 'rgba(254, 202, 202, 0.9)',
   },
+  promptInappropriate: {
+    color: 'rgba(253, 230, 138, 0.92)',
+  },
   actionPill: {
     width: 34,
     height: 34,
@@ -324,4 +376,8 @@ const styles = StyleSheet.create({
   actionPillError: {
     backgroundColor: 'rgba(239, 68, 68, 0.18)',
   },
+  actionPillInappropriate: {
+    backgroundColor: 'rgba(245, 158, 11, 0.2)',
+  },
 });
+

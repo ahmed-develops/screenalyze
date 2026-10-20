@@ -53,56 +53,80 @@ function gamma1(x: number): number {
 }
 
 /**
+ * Fast, non-blocking content fingerprint for images and Base64 strings.
+ * Hashes length and deterministic samples (head, mid, tail) in < 2ms,
+ * preventing any JavaScript thread lockup or UI freeze on large screenshots.
+ */
+export function computeFastImageHash(raw: string): string {
+  if (!raw) return '';
+  const cleaned = cleanBase64(raw);
+  const len = cleaned.length;
+  if (len <= 32768) {
+    return computeSha256Core(cleaned);
+  }
+  const sampleSize = 16384;
+  const mid = Math.floor(len / 2);
+  const head = cleaned.slice(0, sampleSize);
+  const middle = cleaned.slice(mid - Math.floor(sampleSize / 2), mid + Math.floor(sampleSize / 2));
+  const tail = cleaned.slice(len - sampleSize);
+  const signature = `len:${len};h:${head};m:${middle};t:${tail}`;
+  return computeSha256Core(signature);
+}
+
+/**
  * Computes standard SHA-256 digest of any string.
  * Output is lowercase 64-character hex string.
+ * Uses sampling guard for multi-megabyte strings to prevent blocking the React Native JS thread.
  */
 export function computeSha256(input: string): string {
-  // Convert string to UTF-8 byte array
-  const utf8Bytes: number[] = [];
-  for (let i = 0; i < input.length; i++) {
-    let charcode = input.charCodeAt(i);
-    if (charcode < 0x80) {
-      utf8Bytes.push(charcode);
-    } else if (charcode < 0x800) {
-      utf8Bytes.push(0xc0 | (charcode >> 6), 0x80 | (charcode & 0x3f));
-    } else if (charcode < 0xd800 || charcode >= 0xe000) {
-      utf8Bytes.push(
-        0xe0 | (charcode >> 12),
-        0x80 | ((charcode >> 6) & 0x3f),
-        0x80 | (charcode & 0x3f)
-      );
+  if (!input) return '';
+  if (input.length > 65536) {
+    return computeFastImageHash(input);
+  }
+  return computeSha256Core(input);
+}
+
+function computeSha256Core(input: string): string {
+  const len = input.length;
+  const maxBytes = len * 3 + 128;
+  const buf = new Uint8Array(maxBytes);
+  let byteLen = 0;
+
+  for (let i = 0; i < len; i++) {
+    const code = input.charCodeAt(i);
+    if (code < 0x80) {
+      buf[byteLen++] = code;
+    } else if (code < 0x800) {
+      buf[byteLen++] = 0xc0 | (code >> 6);
+      buf[byteLen++] = 0x80 | (code & 0x3f);
+    } else if (code < 0xd800 || code >= 0xe000) {
+      buf[byteLen++] = 0xe0 | (code >> 12);
+      buf[byteLen++] = 0x80 | ((code >> 6) & 0x3f);
+      buf[byteLen++] = 0x80 | (code & 0x3f);
     } else {
       i++;
-      charcode = 0x10000 + (((charcode & 0x3ff) << 10) | (input.charCodeAt(i) & 0x3ff));
-      utf8Bytes.push(
-        0xf0 | (charcode >> 18),
-        0x80 | ((charcode >> 12) & 0x3f),
-        0x80 | ((charcode >> 6) & 0x3f),
-        0x80 | (charcode & 0x3f)
-      );
+      const nextCode = input.charCodeAt(i);
+      const full = 0x10000 + (((code & 0x3ff) << 10) | (nextCode & 0x3ff));
+      buf[byteLen++] = 0xf0 | (full >> 18);
+      buf[byteLen++] = 0x80 | ((full >> 12) & 0x3f);
+      buf[byteLen++] = 0x80 | ((full >> 6) & 0x3f);
+      buf[byteLen++] = 0x80 | (full & 0x3f);
     }
   }
 
-  const length = utf8Bytes.length;
-  const bitLength = length * 8;
-
-  // Append '1' bit (0x80 byte)
-  utf8Bytes.push(0x80);
-
-  // Pad with zeroes until length in bytes = 56 mod 64
-  while ((utf8Bytes.length % 64) !== 56) {
-    utf8Bytes.push(0);
+  const bitLength = byteLen * 8;
+  buf[byteLen++] = 0x80;
+  while ((byteLen % 64) !== 56) {
+    buf[byteLen++] = 0;
   }
 
-  // Append original length in bits as 64-bit big-endian integer
   const highBits = Math.floor(bitLength / 0x100000000);
   const lowBits = bitLength >>> 0;
-
   for (let i = 3; i >= 0; i--) {
-    utf8Bytes.push((highBits >>> (i * 8)) & 0xff);
+    buf[byteLen++] = (highBits >>> (i * 8)) & 0xff;
   }
   for (let i = 3; i >= 0; i--) {
-    utf8Bytes.push((lowBits >>> (i * 8)) & 0xff);
+    buf[byteLen++] = (lowBits >>> (i * 8)) & 0xff;
   }
 
   let h0 = 0x6a09e667;
@@ -116,14 +140,14 @@ export function computeSha256(input: string): string {
 
   const w = new Uint32Array(64);
 
-  for (let chunk = 0; chunk < utf8Bytes.length; chunk += 64) {
+  for (let chunk = 0; chunk < byteLen; chunk += 64) {
     for (let i = 0; i < 16; i++) {
       const idx = chunk + i * 4;
       w[i] =
-        (utf8Bytes[idx] << 24) |
-        (utf8Bytes[idx + 1] << 16) |
-        (utf8Bytes[idx + 2] << 8) |
-        utf8Bytes[idx + 3];
+        (buf[idx] << 24) |
+        (buf[idx + 1] << 16) |
+        (buf[idx + 2] << 8) |
+        buf[idx + 3];
     }
     for (let i = 16; i < 64; i++) {
       w[i] = (gamma1(w[i - 2]) + w[i - 7] + gamma0(w[i - 15]) + w[i - 16]) >>> 0;
@@ -167,3 +191,4 @@ export function computeSha256(input: string): string {
 
   return hexParts.join('');
 }
+

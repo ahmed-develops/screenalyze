@@ -57,6 +57,8 @@ class UserService:
             doc = await db_service.users.find_one({"email": cleaned})
             if doc:
                 doc.pop("_id", None)
+                if doc.get("is_registered") is None:
+                    doc["is_registered"] = False
                 return UserProfile(**doc)
 
             display_name = cleaned.split("@")[0].replace(".", " ").title()
@@ -69,6 +71,7 @@ class UserService:
                 total_captures=0,
                 total_tutorials=0,
                 accuracy_rate="100%",
+                is_registered=False,
             )
             await db_service.users.insert_one(new_profile.model_dump())
             return new_profile
@@ -94,6 +97,7 @@ class UserService:
             total_captures=0,
             total_tutorials=0,
             accuracy_rate="100%",
+            is_registered=False,
         )
         users[cleaned] = new_profile.model_dump()
         data["users"] = users
@@ -108,13 +112,18 @@ class UserService:
             doc = await db_service.users.find_one({"email": cleaned})
             if doc:
                 doc.pop("_id", None)
+                if doc.get("is_registered") is None:
+                    doc["is_registered"] = False
                 return UserProfile(**doc)
             return None
 
         data = self._read_store()
         users = data.get("users", {})
         if cleaned in users:
-            return UserProfile(**users[cleaned])
+            u_data = users[cleaned]
+            if u_data.get("is_registered") is None:
+                u_data["is_registered"] = False
+            return UserProfile(**u_data)
         default_prof = data.get("profile", {})
         if default_prof.get("email", "").strip().lower() == cleaned:
             return UserProfile(**default_prof)
@@ -129,6 +138,7 @@ class UserService:
             target_email = current.email.strip().lower()
 
         update_dict = {k: v for k, v in update.model_dump(exclude_unset=True).items() if v is not None}
+
 
         # MongoDB Path
         if db_service.is_connected() and db_service.users is not None:

@@ -37,11 +37,12 @@ import { StorageService } from '../../services/storageService';
 import { ApiClient } from '../../services/apiClient';
 import { ActionPickerModal } from '../../components/ActionPickerModal';
 import { ScreenshotPickerModal } from '../../components/ScreenshotPickerModal';
-import { computeSha256, cleanBase64 } from '../../utils/crypto';
+import { computeFastImageHash } from '../../utils/crypto';
 import { NotificationBanner } from '../../components/NotificationBanner';
 import { BackTapGuideModal } from '../../components/BackTapGuideModal';
 import { PastScreenshotsPromptModal } from '../../components/PastScreenshotsPromptModal';
 import { ScreenshotAnalysis, UserProfile, isAppropriateScreenshot } from '../../types';
+import { getInappropriateScreenshotError } from '../../utils/errorUtils';
 import { StitchTheme } from '../../theme/stitchTheme';
 import { useTheme } from '../../theme/ThemeContext';
 
@@ -146,6 +147,15 @@ export default function HomeSummaryScreen() {
     onPastScreenshotsPending: () => {
       setIsPastPromptVisible(true);
     },
+    onAnalysisError: (error, isManualPick) => {
+      if (error.isInappropriate && isManualPick) {
+        Alert.alert(
+          error.title || 'Screenshot Filtered',
+          error.message,
+          [{ text: 'Got It', style: 'default' }]
+        );
+      }
+    },
   });
 
   const checkApiKey = useCallback(async () => {
@@ -229,9 +239,9 @@ export default function HomeSummaryScreen() {
           return;
         }
 
-        // 2. Fast check by content SHA-256 fingerprint if preloaded base64 exists
+        // 2. Fast check by content fingerprint if preloaded base64 exists
         if (picked.base64) {
-          const imgHash = computeSha256(cleanBase64(picked.base64));
+          const imgHash = computeFastImageHash(picked.base64);
           const existingByHash = await StorageService.findExistingScreenshot({ imageHash: imgHash });
           if (existingByHash) {
             Alert.alert(
@@ -259,10 +269,12 @@ export default function HomeSummaryScreen() {
           });
 
           if (isIgnored) {
-            Alert.alert(
-              'Photo Skipped',
-              'This image was previously evaluated and identified as personal or non-actionable.'
+            const errInfo = getInappropriateScreenshotError(
+              'Personal or Non-Actionable',
+              'This screenshot was previously filtered out because it does not contain actionable technical content or code.',
+              picked.uri
             );
+            Alert.alert(errInfo.title, errInfo.message);
             return;
           }
         }
@@ -273,18 +285,12 @@ export default function HomeSummaryScreen() {
         });
         if (analyzed && isAppropriateScreenshot(analyzed)) {
           setModalItem(analyzed);
-        } else if (!analyzed && bannerError) {
-          Alert.alert(
-            bannerError.title,
-            bannerError.message,
-            [{ text: 'OK', onPress: () => dismissBannerError() }]
-          );
         }
       } catch (e) {
         console.error('Failed processing selected screenshot', e);
       }
     },
-    [processScreenshotUri, resetOfflineState, bannerError, dismissBannerError]
+    [processScreenshotUri, resetOfflineState]
   );
 
   const handleActionComplete = (updated: ScreenshotAnalysis) => {
@@ -421,7 +427,15 @@ export default function HomeSummaryScreen() {
               setModalItem(bannerItem);
               setBannerItem(null);
             } else if (bannerError) {
-              dismissBannerError();
+              if (bannerError.isInappropriate) {
+                Alert.alert(
+                  bannerError.title,
+                  `${bannerError.message}\n\nTip: Screenalyze specializes in code snippets, UI designs, system architectures, error logs, and technical tutorials. Non-technical photos are automatically skipped to keep your workspace clean.`,
+                  [{ text: 'Dismiss', onPress: () => dismissBannerError() }]
+                );
+              } else {
+                dismissBannerError();
+              }
             }
           }}
           onDismiss={() => {
@@ -596,7 +610,6 @@ export default function HomeSummaryScreen() {
               style={styles.primaryActionBtn}
               onPress={handlePickFromLibrary}
               activeOpacity={0.85}
-              disabled={isAnalyzing}
             >
               <LinearGradient
                 colors={['#0099ff', '#0077cc']}
@@ -604,8 +617,14 @@ export default function HomeSummaryScreen() {
                 end={{ x: 1, y: 0 }}
                 style={styles.actionBtnGradient}
               >
-                <ImageIcon size={17} color="#ffffff" />
-                <Text style={styles.primaryActionBtnText}>Pick A Screenshot</Text>
+                {isAnalyzing ? (
+                  <ActivityIndicator size="small" color="#ffffff" style={{ marginRight: 6 }} />
+                ) : (
+                  <ImageIcon size={17} color="#ffffff" />
+                )}
+                <Text style={styles.primaryActionBtnText}>
+                  {isAnalyzing ? 'Analyzing in background...' : 'Pick A Screenshot'}
+                </Text>
               </LinearGradient>
             </TouchableOpacity>
 

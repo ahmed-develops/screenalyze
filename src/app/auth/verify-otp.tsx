@@ -114,19 +114,47 @@ export default function VerifyOtpScreen() {
       Keyboard.dismiss();
       inputRef.current?.blur();
 
-      // Persist session token & profile returned from backend
+      // Persist session token returned from backend
       if (authRes.token) {
         await StorageService.saveAuthSession(authRes.token, email);
       }
+
+      // Check if user is signing in for the first time
+      const isRegisteredLocal = await StorageService.isUserRegistered(email);
+      const isNewUser = Boolean(
+        authRes.is_new_user === true ||
+        authRes.user?.isRegistered === false ||
+        !isRegisteredLocal
+      );
+
       if (authRes.user) {
-        await StorageService.saveUserProfile(authRes.user);
+        await StorageService.saveUserProfile(
+          {
+            ...authRes.user,
+            isRegistered: !isNewUser,
+          },
+          email
+        );
       }
 
-      // Check device biometric capabilities
+      if (isNewUser) {
+        await StorageService.setUserRegistered(email, false);
+        // Brand new user: MUST complete registration form first; Face ID is NEVER prompted on first login
+        setTimeout(() => {
+          Keyboard.dismiss();
+          router.replace({
+            pathname: '/auth/register',
+            params: { email },
+          });
+        }, 100);
+        return;
+      }
+
+      // Existing user: check if Face ID was previously configured
+      const isBioEnabled = await StorageService.isBiometricLockEnabled(email);
       const biometricStatus = await BiometricService.checkBiometricStatus();
 
-      // If biometrics is supported on this device, prompt user for consent
-      if (biometricStatus.isSupported) {
+      if (!isBioEnabled && biometricStatus.isSupported) {
         setTimeout(() => {
           Alert.alert(
             `Enable ${biometricStatus.label}?`,
@@ -136,8 +164,6 @@ export default function VerifyOtpScreen() {
                 text: 'Not Now',
                 style: 'cancel',
                 onPress: async () => {
-                  await StorageService.setBiometricLockEnabled(false, email);
-                  await StorageService.saveUserProfile({ biometricLock: false });
                   Keyboard.dismiss();
                   router.replace('/(tabs)');
                 },
@@ -155,10 +181,7 @@ export default function VerifyOtpScreen() {
                       await StorageService.saveBiometricToken(email, authRes.token);
                     }
                     await StorageService.setBiometricLockEnabled(true, email);
-                    await StorageService.saveUserProfile({ biometricLock: true });
-                  } else {
-                    await StorageService.setBiometricLockEnabled(false, email);
-                    await StorageService.saveUserProfile({ biometricLock: false });
+                    await StorageService.saveUserProfile({ biometricLock: true }, email);
                   }
                   Keyboard.dismiss();
                   router.replace('/(tabs)');
@@ -169,18 +192,10 @@ export default function VerifyOtpScreen() {
           );
         }, 150);
       } else {
-        await StorageService.setBiometricLockEnabled(false, email);
         setTimeout(() => {
-          Alert.alert('Success', 'Email verified successfully! Welcome to Screenalyze.', [
-            {
-              text: 'Get Started',
-              onPress: () => {
-                Keyboard.dismiss();
-                router.replace('/(tabs)');
-              },
-            },
-          ]);
-        }, 100);
+          Keyboard.dismiss();
+          router.replace('/(tabs)');
+        }, 150);
       }
     } catch (err: unknown) {
       setIsVerifying(false);

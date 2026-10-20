@@ -351,26 +351,13 @@ export const MediaService = {
       const unanalyzed = screenshots.filter((asset) => !analyzedIds.has(asset.id));
       if (unanalyzed.length === 0) return [];
 
-      const resolved: RetrievedPhoto[] = [];
-      for (const item of unanalyzed) {
-        let resolvedUri = item.uri;
-        try {
-          const assetInfo = await LegacyMediaLibrary.getAssetInfoAsync(item, {
-            shouldDownloadFromNetwork: true,
-          });
-          if (assetInfo.localUri) resolvedUri = assetInfo.localUri;
-        } catch {
-          // fallback to uri
-        }
-        resolved.push({
-          uri: resolvedUri,
-          id: item.id,
-          creationTime: item.creationTime,
-          filename: item.filename,
-        });
-      }
-
-      return resolved;
+      // Return candidate screenshots immediately without blocking serial network requests
+      return unanalyzed.map((item) => ({
+        uri: item.uri,
+        id: item.id,
+        creationTime: item.creationTime,
+        filename: item.filename,
+      }));
     } catch (err) {
       console.error('getUnanalyzedScreenshots failed', err);
       return [];

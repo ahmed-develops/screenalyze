@@ -335,6 +335,14 @@
       "reason": "The post includes a discussion about programming in Haskell, which is relevant for knowledge workers and developers.",
       "image_hash": "19fed16e748e099cd6e2760c09e2eca46c54ec33851145274e9128cfa7787a33",
       "cached": false
+    },
+    "08d2510b3efdc29bef580141ada91783ad64bea5734413ca09425dca991aa0da": {
+      "is_worth_analyzing": true,
+      "category": "social-post",
+      "confidence": 0.85,
+      "reason": "The post promotes a tool with actionable insights and features relevant to knowledge workers and developers.",
+      "image_hash": "08d2510b3efdc29bef580141ada91783ad64bea5734413ca09425dca991aa0da",
+      "cached": false
     }
   },
   "analyses": {
@@ -1536,6 +1544,46 @@
       ],
       "is_worth_analyzing": true,
       "image_hash": "19fed16e748e099cd6e2760c09e2eca46c54ec33851145274e9128cfa7787a33",
+      "already_analyzed": false
+    },
+    "08d2510b3efdc29bef580141ada91783ad64bea5734413ca09425dca991aa0da": {
+      "title": "Advertisement for Macro: A Modular App Built in Rust",
+      "category": "social-post",
+      "summary": "This screenshot displays an advertisement for Macro, a modular application that integrates various functionalities such as documents, email, messages, calendar, and CRM into one platform. The app is open source and developed using the Rust programming language, emphasizing its robust and efficient design.",
+      "key_points": [
+        "Macro combines multiple functionalities into a single app.",
+        "The app is open source, allowing for community contributions.",
+        "Built using Rust, highlighting performance and safety.",
+        "Features include docs, email, messages, calendar, and CRM."
+      ],
+      "contextual_actions": [
+        {
+          "id": "action-1",
+          "label": "Create a step-by-step guide to setting up Macro for team collaboration",
+          "badge": "Step-by-Step Tutorial",
+          "type": "tutorial"
+        },
+        {
+          "id": "action-2",
+          "label": "Explain the advantages of using Rust for developing modular applications",
+          "badge": "Concept Explanation",
+          "type": "explanation"
+        },
+        {
+          "id": "action-3",
+          "label": "Break down the architecture of Macro and its integration of multiple services",
+          "badge": "System Breakdown",
+          "type": "diagram"
+        }
+      ],
+      "follow_up_questions": [
+        "How does Macro ensure data security across its integrated services?",
+        "What are the performance benefits of using Rust in Macro?",
+        "How does Macro's open-source nature impact its development and features?",
+        "What are the key differences between Macro and other modular apps like Notion?"
+      ],
+      "is_worth_analyzing": true,
+      "image_hash": "08d2510b3efdc29bef580141ada91783ad64bea5734413ca09425dca991aa0da",
       "already_analyzed": false
     }
   }

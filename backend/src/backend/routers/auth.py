@@ -7,6 +7,7 @@ from ..schemas.auth import (
     OTPVerifyRequest,
     OTPVerifyResponse,
     SessionUserResponse,
+    BiometricLoginRequest,
 )
 from ..schemas.user import UserProfile
 from ..dependencies import get_current_user
@@ -71,6 +72,19 @@ async def verify_otp(req: OTPVerifyRequest) -> OTPVerifyResponse:
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=str(e),
         )
+
+@router.post(
+    "/biometric-login",
+    response_model=OTPVerifyResponse,
+    summary="Create authenticated session following on-device biometric verification",
+)
+async def biometric_login(req: BiometricLoginRequest) -> OTPVerifyResponse:
+    if not req.email or "@" not in req.email or "." not in req.email:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="A valid email address is required.",
+        )
+    return await auth_service.create_biometric_session(req.email)
 
 @router.get(
     "/me",

@@ -8,8 +8,12 @@ import { AIService } from '../services/aiService';
 import { ApiClient } from '../services/apiClient';
 import { NotificationService } from '../services/notificationService';
 import { StorageService } from '../services/storageService';
-import { computeSha256, cleanBase64 } from '../utils/crypto';
-import { getFriendlyAnalysisError, FormattedAnalysisError } from '../utils/errorUtils';
+import { computeFastImageHash } from '../utils/crypto';
+import {
+  getFriendlyAnalysisError,
+  getInappropriateScreenshotError,
+  FormattedAnalysisError,
+} from '../utils/errorUtils';
 
 export interface PendingScreenshot {
   uri: string;
@@ -22,7 +26,7 @@ export interface PendingScreenshot {
 export function useScreenshotDetector(options?: {
   onScreenshotDetected?: (pending: PendingScreenshot) => void;
   onScreenshotAnalyzed?: (item: ScreenshotAnalysis, isManualPick?: boolean) => void;
-  onAnalysisError?: (error: FormattedAnalysisError) => void;
+  onAnalysisError?: (error: FormattedAnalysisError, isManualPick?: boolean) => void;
   onPastScreenshotsPending?: (pastScreenshots: RetrievedPhoto[]) => void;
 }) {
   const [isListening, setIsListening] = useState(true);
@@ -43,10 +47,12 @@ export function useScreenshotDetector(options?: {
 
   const lastProcessedIdRef = useRef<string | null>(null);
   const isAnalyzingRef = useRef<boolean>(false);
+  const isCheckingRef = useRef<boolean>(false);
   const isServerOfflineRef = useRef<boolean>(false);
   const pastPromptDismissedRef = useRef<boolean>(false);
   const failedAssetIdsRef = useRef<Set<string>>(new Set());
   const pollingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const resetOfflineState = useCallback(() => {
     isServerOfflineRef.current = false;
@@ -126,9 +132,9 @@ export function useScreenshotDetector(options?: {
           }
         }
 
-        // Read bytes and calculate content fingerprint (SHA-256)
+        // Read bytes and calculate content fingerprint
         const base64Data = await AIService.getImageBase64(imageUri, preloadedBase64);
-        const imgHash = base64Data ? computeSha256(cleanBase64(base64Data)) : undefined;
+        const imgHash = base64Data ? computeFastImageHash(base64Data) : undefined;
 
         // Check deduplication engine by hash
         if (imgHash) {
@@ -159,6 +165,19 @@ export function useScreenshotDetector(options?: {
           if (isIgnored) {
             console.log(`[Deduplication] Photo previously dismissed as personal/non-actionable`);
             if (externalId) lastProcessedIdRef.current = externalId;
+            if (processOptions?.isManualPick) {
+              const errorInfo = getInappropriateScreenshotError(
+                'Personal or Non-Actionable',
+                'This screenshot was previously filtered out because it does not contain actionable technical content or code.',
+                imageUri
+              );
+              setErrorMessage(errorInfo.message);
+              setBannerError(errorInfo);
+              setPendingItem(null);
+              if (optionsRef.current?.onAnalysisError) {
+                optionsRef.current.onAnalysisError(errorInfo, true);
+              }
+            }
             return null;
           }
         }
@@ -180,6 +199,22 @@ export function useScreenshotDetector(options?: {
             await StorageService.addIgnoredAssetId(ignoredId);
             if (imgHash) {
               await StorageService.addIgnoredHash(imgHash);
+            }
+
+            const errorInfo = getInappropriateScreenshotError(
+              categorization.category,
+              categorization.reason,
+              imageUri
+            );
+
+            if (!processOptions?.isBatch) {
+              setErrorMessage(errorInfo.message);
+              setBannerError(errorInfo);
+              setPendingItem(null);
+            }
+
+            if (optionsRef.current?.onAnalysisError) {
+              optionsRef.current.onAnalysisError(errorInfo, Boolean(processOptions?.isManualPick));
             }
             return null;
           }
@@ -238,6 +273,22 @@ export function useScreenshotDetector(options?: {
           if (imgHash) {
             await StorageService.addIgnoredHash(imgHash);
           }
+
+          const errorInfo = getInappropriateScreenshotError(
+            newAnalysisItem.category,
+            newAnalysisItem.summary,
+            imageUri
+          );
+
+          if (!processOptions?.isBatch) {
+            setErrorMessage(errorInfo.message);
+            setBannerError(errorInfo);
+            setPendingItem(null);
+          }
+
+          if (optionsRef.current?.onAnalysisError) {
+            optionsRef.current.onAnalysisError(errorInfo, Boolean(processOptions?.isManualPick));
+          }
           return null;
         }
 
@@ -287,7 +338,7 @@ export function useScreenshotDetector(options?: {
         }
 
         if (optionsRef.current?.onAnalysisError) {
-          optionsRef.current.onAnalysisError(errorInfo);
+          optionsRef.current.onAnalysisError(errorInfo, Boolean(processOptions?.isManualPick));
         }
 
         return null;
@@ -436,11 +487,12 @@ export function useScreenshotDetector(options?: {
    */
   const checkForNewScreenshot = useCallback(
     async (force = false): Promise<boolean> => {
-      if (isAnalyzingRef.current) return false;
+      if (isCheckingRef.current || isAnalyzingRef.current) return false;
       if (!force && isServerOfflineRef.current) {
         return false;
       }
 
+      isCheckingRef.current = true;
       try {
         const currentSettings = await StorageService.getSettings();
         if (!force && !currentSettings.autoAnalyzeScreenshots) {
@@ -504,6 +556,8 @@ export function useScreenshotDetector(options?: {
         setIsAnalyzing(false);
         setPendingItem(null);
         return false;
+      } finally {
+        isCheckingRef.current = false;
       }
     },
     [runBatchAnalysisInternal]
@@ -568,28 +622,34 @@ export function useScreenshotDetector(options?: {
     let screenCaptureSubscription: ScreenCapture.Subscription | null = null;
     let mediaLibrarySubscription: LegacyMediaLibrary.Subscription | null = null;
 
+    const triggerDebouncedPoll = (attempts = 3, delay = 750) => {
+      if (isServerOfflineRef.current) return;
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current);
+      }
+      debounceTimerRef.current = setTimeout(() => {
+        pollForNewScreenshot(attempts, delay);
+      }, 350);
+    };
+
     // 0. Immediate scan on initial mount (if server is not known to be offline)
     if (!isServerOfflineRef.current) {
-      pollForNewScreenshot(4, 700);
+      pollForNewScreenshot(3, 750);
     }
 
     // 1. Listen for in-app screenshot captures (power + volume buttons while inside app)
     try {
       screenCaptureSubscription = ScreenCapture.addScreenshotListener(() => {
-        if (!isServerOfflineRef.current) {
-          pollForNewScreenshot(6, 700);
-        }
+        triggerDebouncedPoll(4, 750);
       });
     } catch (e) {
       console.warn('Failed to subscribe to ScreenCapture listener', e);
     }
 
-    // 2. Listen to iOS Photo Library change notifications (fires the instant iOS commits screenshot to disk)
+    // 2. Listen to iOS Photo Library change notifications (debounced to avoid multiple triggers on disk write)
     try {
       mediaLibrarySubscription = LegacyMediaLibrary.addListener(() => {
-        if (!isServerOfflineRef.current) {
-          checkForNewScreenshot();
-        }
+        triggerDebouncedPoll(3, 750);
       });
     } catch (e) {
       console.warn('Failed to subscribe to MediaLibrary listener', e);
@@ -605,13 +665,13 @@ export function useScreenshotDetector(options?: {
               failedAssetIdsRef.current.clear();
               setBannerError(null);
               setErrorMessage(null);
-              pollForNewScreenshot(4, 700);
+              triggerDebouncedPoll(3, 750);
             })
             .catch(() => {
               // Server is still offline
             });
         } else {
-          pollForNewScreenshot(5, 700);
+          triggerDebouncedPoll(3, 750);
         }
       }
     });
@@ -627,6 +687,10 @@ export function useScreenshotDetector(options?: {
       if (pollingTimeoutRef.current) {
         clearTimeout(pollingTimeoutRef.current);
         pollingTimeoutRef.current = null;
+      }
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current);
+        debounceTimerRef.current = null;
       }
     };
   }, [checkForNewScreenshot, pollForNewScreenshot]);

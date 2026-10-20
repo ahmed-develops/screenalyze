@@ -1,9 +1,9 @@
 {
   "profile": {
-    "name": "User Beta",
-    "email": "user.beta@screenalyze.ai",
-    "role": "Principal AI Architect",
-    "company": "Screenalyze AI Labs",
+    "name": "Testdummy999",
+    "email": "testdummy999@test.com",
+    "role": "Product Creator",
+    "company": "Screenalyze Workspace",
     "avatar_uri": "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=400&q=80",
     "plan": "pro",
     "plan_name": "Pro",
@@ -13,7 +13,8 @@
     "accuracy_rate": "100%",
     "cloud_sync": true,
     "biometric_lock": true,
-    "telemetry_enabled": false
+    "telemetry_enabled": false,
+    "is_registered": false
   },
   "settings": {
     "auto_analyze_screenshots": true,
@@ -122,6 +123,23 @@
       "cloud_sync": true,
       "biometric_lock": true,
       "telemetry_enabled": false
+    },
+    "testdummy999@test.com": {
+      "name": "Testdummy999",
+      "email": "testdummy999@test.com",
+      "role": "Product Creator",
+      "company": "Screenalyze Workspace",
+      "avatar_uri": "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=400&q=80",
+      "plan": "pro",
+      "plan_name": "Pro",
+      "member_since": "October 2026",
+      "total_captures": 0,
+      "total_tutorials": 0,
+      "accuracy_rate": "100%",
+      "cloud_sync": true,
+      "biometric_lock": true,
+      "telemetry_enabled": false,
+      "is_registered": false
     }
   },
   "user_settings": {

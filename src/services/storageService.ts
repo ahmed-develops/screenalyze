@@ -13,6 +13,7 @@ const STORAGE_KEYS = {
   BIOMETRIC_LOCK: '@screenalyze_biometric_lock_v1',
   BIOMETRIC_LINKED_EMAIL: '@screenalyze_biometric_linked_email_v1',
   BIOMETRIC_TOKEN_PREFIX: '@screenalyze_biometric_token_v1_',
+  USER_REGISTERED: '@screenalyze_user_registered_v1',
 };
 
 export const DEFAULT_USER_PROFILE: UserProfile = {
@@ -31,6 +32,7 @@ export const DEFAULT_USER_PROFILE: UserProfile = {
   cloudSync: true,
   biometricLock: true,
   telemetryEnabled: false,
+  isRegistered: false,
 };
 
 const DEFAULT_SETTINGS: AppSettings = {
@@ -400,7 +402,11 @@ export const StorageService = {
 
   async getUserProfile(targetEmail?: string | null): Promise<UserProfile> {
     const email = (targetEmail || (await this.getActiveUserEmail()))?.trim().toLowerCase();
-    if (!targetEmail && cachedUserProfile) return cachedUserProfile;
+    if (!targetEmail && cachedUserProfile) {
+      if (!email || cachedUserProfile.email.toLowerCase() === email.toLowerCase()) {
+        return cachedUserProfile;
+      }
+    }
 
     const scopedKey = this.getScopedKey(STORAGE_KEYS.USER_PROFILE, email);
 
@@ -408,9 +414,16 @@ export const StorageService = {
       // 1. Try syncing from FastAPI backend
       try {
         const backendProfile = await ApiClient.getUserProfile();
-        cachedUserProfile = backendProfile;
-        await AsyncStorage.setItem(scopedKey, JSON.stringify(backendProfile));
-        return backendProfile;
+        // Security guard: Only accept backend profile if it matches the current active user!
+        if (!email || backendProfile.email.toLowerCase() === email.toLowerCase()) {
+          cachedUserProfile = backendProfile;
+          await AsyncStorage.setItem(scopedKey, JSON.stringify(backendProfile));
+          return backendProfile;
+        } else {
+          console.warn(
+            `[StorageService] Backend returned profile for ${backendProfile.email}, but active user is ${email}. Rejecting mismatched profile.`
+          );
+        }
       } catch {
         // Backend offline or unauthenticated; fallback to local scoped cache
       }
@@ -442,6 +455,7 @@ export const StorageService = {
           cloudSync: true,
           biometricLock: true,
           telemetryEnabled: false,
+          isRegistered: false,
         };
         cachedUserProfile = freshProfile;
         return freshProfile;
@@ -450,6 +464,8 @@ export const StorageService = {
       const res: UserProfile = {
         ...DEFAULT_USER_PROFILE,
         ...parsed,
+        isRegistered: Boolean(parsed.isRegistered === true),
+        email: email || parsed.email || 'user@screenalyze.ai',
       };
       cachedUserProfile = res;
       return res;
@@ -460,13 +476,13 @@ export const StorageService = {
     }
   },
 
-  async saveUserProfile(profile: Partial<UserProfile>): Promise<UserProfile> {
+  async saveUserProfile(profile: Partial<UserProfile>, targetEmail?: string | null): Promise<UserProfile> {
     try {
-      const email = await this.getActiveUserEmail();
+      const email = (targetEmail || (await this.getActiveUserEmail()))?.trim().toLowerCase();
       const scopedKey = this.getScopedKey(STORAGE_KEYS.USER_PROFILE, email);
 
-      const current = await this.getUserProfile();
-      const updated: UserProfile = { ...current, ...profile };
+      const current = await this.getUserProfile(email);
+      const updated: UserProfile = { ...current, ...profile, ...(email ? { email } : {}) };
       cachedUserProfile = updated;
       await AsyncStorage.setItem(scopedKey, JSON.stringify(updated));
 
@@ -621,12 +637,57 @@ export const StorageService = {
   async getBiometricLinkedEmail(): Promise<string | null> {
     try {
       const email = await AsyncStorage.getItem(STORAGE_KEYS.BIOMETRIC_LINKED_EMAIL);
-      if (email) return email.trim().toLowerCase();
-      const session = await this.getAuthSession();
-      if (session?.email) return session.email.trim().toLowerCase();
-      return 'muhammad.ahmed31612@gmail.com';
+      if (email && email.trim().length > 0) return email.trim().toLowerCase();
+      return null;
     } catch {
-      return 'muhammad.ahmed31612@gmail.com';
+      return null;
+    }
+  },
+
+  /**
+   * Strictly determines whether Face ID / biometric fast login is ready for use on this device.
+   * NEVER returns true for new users or devices without confirmed biometric consent.
+   */
+  async isBiometricReadyForLogin(): Promise<{ ready: boolean; email: string | null }> {
+    try {
+      const linked = await this.getBiometricLinkedEmail();
+      if (!linked) return { ready: false, email: null };
+
+      const isEnabled = await this.isBiometricLockEnabled(linked);
+      if (!isEnabled) return { ready: false, email: null };
+
+      const token = await this.getBiometricToken(linked);
+      if (!token) return { ready: false, email: null };
+
+      return { ready: true, email: linked };
+    } catch {
+      return { ready: false, email: null };
+    }
+  },
+
+  async isUserRegistered(email?: string | null): Promise<boolean> {
+    try {
+      const target = (email || (await this.getActiveUserEmail()))?.trim().toLowerCase();
+      if (!target) return false;
+      const key = this.getScopedKey(STORAGE_KEYS.USER_REGISTERED, target);
+      const val = await AsyncStorage.getItem(key);
+      if (val === 'true') return true;
+      if (val === 'false') return false;
+      const profile = await this.getUserProfile(target);
+      return profile.isRegistered === true;
+    } catch {
+      return false;
+    }
+  },
+
+  async setUserRegistered(email: string, registered: boolean): Promise<void> {
+    try {
+      const target = email.trim().toLowerCase();
+      const key = this.getScopedKey(STORAGE_KEYS.USER_REGISTERED, target);
+      await AsyncStorage.setItem(key, registered ? 'true' : 'false');
+      await this.saveUserProfile({ isRegistered: registered }, target);
+    } catch (e) {
+      console.warn('Failed saving user registered state:', e);
     }
   },
 
