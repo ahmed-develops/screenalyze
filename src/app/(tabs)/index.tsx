@@ -9,6 +9,7 @@ import {
   Alert,
   TextInput,
   Dimensions,
+  RefreshControl,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router, useFocusEffect } from 'expo-router';
@@ -180,11 +181,16 @@ export default function HomeSummaryScreen() {
 
   const onRefresh = async () => {
     setRefreshing(true);
-    resetOfflineState();
-    await checkApiKey();
-    await triggerScreenshotCheck();
-    await refreshHistory();
-    setRefreshing(false);
+    try {
+      resetOfflineState();
+      await checkApiKey();
+      await triggerScreenshotCheck();
+      await refreshHistory();
+    } catch (err) {
+      console.warn('Failed refreshing screenshots', err);
+    } finally {
+      setRefreshing(false);
+    }
   };
 
   const analyzedIds = useMemo(
@@ -451,9 +457,16 @@ export default function HomeSummaryScreen() {
             { paddingBottom: insets.bottom + 110 },
           ]}
           showsVerticalScrollIndicator={false}
-          bounces={false}
-          alwaysBounceVertical={false}
-          overScrollMode="never"
+          bounces={true}
+          alwaysBounceVertical={true}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              tintColor={StitchTheme.colors.secondary}
+              colors={[StitchTheme.colors.secondary, StitchTheme.colors.primary]}
+            />
+          }
         >
           {/* Integrated Transparent Top Bar (Profile & Reload) */}
           <View style={styles.headerBar}>
@@ -692,6 +705,19 @@ export default function HomeSummaryScreen() {
                 onPress={() => {
                   setErrorMessage(null);
                   dismissBannerError();
+                  resetOfflineState();
+                  void onRefresh();
+                }}
+                style={styles.errorRetryBtn}
+                activeOpacity={0.8}
+              >
+                <Text style={styles.errorRetryText}>Retry</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={() => {
+                  setErrorMessage(null);
+                  dismissBannerError();
+                  resetOfflineState();
                 }}
                 hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                 style={styles.errorCloseBtn}
@@ -1294,6 +1320,19 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: 'rgba(255, 255, 255, 0.75)',
     marginTop: 2,
+  },
+  errorRetryBtn: {
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 8,
+    backgroundColor: 'rgba(239, 68, 68, 0.25)',
+    borderWidth: 1,
+    borderColor: 'rgba(239, 68, 68, 0.4)',
+  },
+  errorRetryText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#FCA5A5',
   },
   errorCloseBtn: {
     padding: 4,

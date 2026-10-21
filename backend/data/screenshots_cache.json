@@ -343,6 +343,14 @@
       "reason": "The post promotes a tool with actionable insights and features relevant to knowledge workers and developers.",
       "image_hash": "08d2510b3efdc29bef580141ada91783ad64bea5734413ca09425dca991aa0da",
       "cached": false
+    },
+    "39ee5d09a13271b5d6ce1a6d8e528ee06652b89129e7f1e2eb48376fc88d5d79": {
+      "is_worth_analyzing": true,
+      "category": "tutorial",
+      "confidence": 0.9,
+      "reason": "The screenshot contains a technical tutorial on data visualization with actionable insights and links for further exploration.",
+      "image_hash": "39ee5d09a13271b5d6ce1a6d8e528ee06652b89129e7f1e2eb48376fc88d5d79",
+      "cached": false
     }
   },
   "analyses": {
@@ -1584,6 +1592,46 @@
       ],
       "is_worth_analyzing": true,
       "image_hash": "08d2510b3efdc29bef580141ada91783ad64bea5734413ca09425dca991aa0da",
+      "already_analyzed": false
+    },
+    "39ee5d09a13271b5d6ce1a6d8e528ee06652b89129e7f1e2eb48376fc88d5d79": {
+      "title": "Guidelines for Building a Real-Time Data Visualization System",
+      "category": "article",
+      "summary": "The screenshot outlines key considerations for creating a dynamic visualization system that updates in real-time with incoming data streams. It emphasizes scalability, latency reduction, and robust error handling, particularly for applications like IoT monitoring where timely insights are crucial.",
+      "key_points": [
+        "Scalability is essential to handle expected data volumes.",
+        "Minimizing latency is crucial for timely data visualization.",
+        "Robust error handling is necessary for network failures and data inconsistencies.",
+        "Real-time data visualization is particularly useful for IoT applications."
+      ],
+      "contextual_actions": [
+        {
+          "id": "action-1",
+          "label": "Create a step-by-step tutorial on implementing real-time data visualization with Matplotlib",
+          "badge": "Step-by-Step Tutorial",
+          "type": "tutorial"
+        },
+        {
+          "id": "action-2",
+          "label": "Explain the trade-offs between scalability and latency in real-time systems",
+          "badge": "Concept Explanation",
+          "type": "explanation"
+        },
+        {
+          "id": "action-3",
+          "label": "Provide a technical breakdown of error handling strategies in data visualization systems",
+          "badge": "System Breakdown",
+          "type": "diagram"
+        }
+      ],
+      "follow_up_questions": [
+        "What specific techniques can be used to minimize latency in data visualization?",
+        "How can machine learning be integrated into real-time data processing?",
+        "What are the challenges of scaling IoT data visualization systems?",
+        "What are the best practices for handling large-scale data streams in visualization?"
+      ],
+      "is_worth_analyzing": true,
+      "image_hash": "39ee5d09a13271b5d6ce1a6d8e528ee06652b89129e7f1e2eb48376fc88d5d79",
       "already_analyzed": false
     }
   }

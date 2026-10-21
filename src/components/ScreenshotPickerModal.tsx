@@ -105,10 +105,11 @@ export const ScreenshotPickerModal: React.FC<ScreenshotPickerModalProps> = ({
       try {
         setSelectedPhotoId(photo.id);
         const resolved = await MediaService.resolveAssetLocalUri(photo);
-        await onSelectScreenshot(resolved);
         handleClose();
+        await onSelectScreenshot(resolved);
       } catch (err) {
         console.error('Error selecting screenshot', err);
+        handleClose();
       } finally {
         setSelectedPhotoId(null);
       }

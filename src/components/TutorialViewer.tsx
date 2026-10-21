@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Platform } from 'react-native';
-import { Copy, Check, Share2, BookOpen, Sparkles, MessageSquare } from 'lucide-react-native';
+import { Copy, Check, Share2, BookOpen, Sparkles, MessageSquare, ChevronRight } from 'lucide-react-native';
 import * as Clipboard from 'expo-clipboard';
 import * as Sharing from 'expo-sharing';
 import { Colors } from '../theme/colors';
@@ -104,8 +104,15 @@ export const TutorialViewer: React.FC<TutorialViewerProps> = ({
                 activeOpacity={0.8}
                 onPress={() => onSelectFollowUp(q)}
               >
-                {/* <Sparkles size={13} color={Colors.accent} /> */}
-                <Text style={styles.nextChipText}>{q}</Text>
+                <Sparkles size={12} color={Colors.accent} />
+                <Text
+                  style={styles.nextChipText}
+                  numberOfLines={1}
+                  ellipsizeMode="tail"
+                >
+                  {q}
+                </Text>
+                <ChevronRight size={13} color="rgba(6, 182, 212, 0.7)" />
               </TouchableOpacity>
             ))}
           </View>
@@ -296,8 +303,8 @@ const styles = StyleSheet.create({
     gap: 8,
     backgroundColor: 'rgba(6, 182, 212, 0.12)',
     paddingHorizontal: 12,
-    paddingVertical: 10,
-    borderRadius: 12,
+    paddingVertical: 9,
+    borderRadius: 20,
     borderWidth: 1,
     borderColor: 'rgba(6, 182, 212, 0.25)',
   },
@@ -306,6 +313,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: Colors.textPrimary,
     flex: 1,
+    flexShrink: 1,
     lineHeight: 16,
   },
   followUpBtn: {

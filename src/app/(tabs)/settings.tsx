@@ -373,9 +373,8 @@ export default function SettingsScreen() {
           style={styles.container}
           contentContainerStyle={styles.contentContainer}
           showsVerticalScrollIndicator={false}
-          bounces={false}
-          alwaysBounceVertical={false}
-          overScrollMode="never"
+          bounces={true}
+          alwaysBounceVertical={true}
         >
           {/* Top Header */}
           <View style={styles.screenHeader}>

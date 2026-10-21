@@ -60,6 +60,10 @@ export function useScreenshotDetector(options?: {
     failedAssetIdsRef.current.clear();
     setBannerError(null);
     setErrorMessage(null);
+    setIsAnalyzing(false);
+    isAnalyzingRef.current = false;
+    setPendingItem(null);
+    setAnalysisStatus('');
   }, []);
 
   const dismissPastScreenshotsPrompt = useCallback(() => {
@@ -405,76 +409,81 @@ export function useScreenshotDetector(options?: {
       setIsAnalyzing(true);
       setErrorMessage(null);
 
-      const currentSettings = await StorageService.getSettings();
-      if (currentSettings.enableNotifications && AppState.currentState !== 'active') {
-        await NotificationService.notifyBatchAnalysisStarted(totalCount);
-      }
+      try {
+        const currentSettings = await StorageService.getSettings();
+        if (currentSettings.enableNotifications && AppState.currentState !== 'active') {
+          await NotificationService.notifyBatchAnalysisStarted(totalCount);
+        }
 
-      const now = new Date();
-      const startOfTodayMs = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
-      const toMs = (t: number) => (t < 1e11 ? t * 1000 : t);
+        const now = new Date();
+        const startOfTodayMs = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+        const toMs = (t: number) => (t < 1e11 ? t * 1000 : t);
 
-      let analyzedCount = 0;
-      let lastAnalyzedItem: ScreenshotAnalysis | null = null;
+        let analyzedCount = 0;
+        let lastAnalyzedItem: ScreenshotAnalysis | null = null;
 
-      for (let i = 0; i < candidates.length; i++) {
-        if (isServerOfflineRef.current) {
-          for (let j = i; j < candidates.length; j++) {
-            failedAssetIdsRef.current.add(candidates[j].id);
+        for (let i = 0; i < candidates.length; i++) {
+          if (isServerOfflineRef.current) {
+            for (let j = i; j < candidates.length; j++) {
+              failedAssetIdsRef.current.add(candidates[j].id);
+            }
+            break;
           }
-          break;
+
+          const candidate = candidates[i];
+          lastProcessedIdRef.current = candidate.id;
+
+          const isCandidateToday = toMs(candidate.creationTime) >= startOfTodayMs;
+          const ONE_DAY_MS = 24 * 60 * 60 * 1000;
+          const dayLabel = isCandidateToday
+            ? 'Today'
+            : toMs(candidate.creationTime) >= startOfTodayMs - ONE_DAY_MS
+              ? 'Yesterday'
+              : new Date(toMs(candidate.creationTime)).toLocaleDateString([], { month: 'short', day: 'numeric' });
+
+          const pending: PendingScreenshot = {
+            uri: candidate.uri,
+            id: candidate.id,
+            status: `Analyzing screenshot ${i + 1} of ${totalCount} (${dayLabel})...`,
+            totalCount,
+            currentIndex: i + 1,
+          };
+          setPendingItem(pending);
+          if (optionsRef.current?.onScreenshotDetected) {
+            optionsRef.current.onScreenshotDetected(pending);
+          }
+
+          const result = await processScreenshotInternal(candidate.uri, candidate.id, undefined, {
+            isManualPick: false,
+            silentNotification: true,
+            isBatch: true,
+          });
+
+          if (result && isAppropriateScreenshot(result)) {
+            analyzedCount++;
+            lastAnalyzedItem = result;
+          }
         }
 
-        const candidate = candidates[i];
-        lastProcessedIdRef.current = candidate.id;
-
-        const isCandidateToday = toMs(candidate.creationTime) >= startOfTodayMs;
-        const ONE_DAY_MS = 24 * 60 * 60 * 1000;
-        const dayLabel = isCandidateToday
-          ? 'Today'
-          : toMs(candidate.creationTime) >= startOfTodayMs - ONE_DAY_MS
-            ? 'Yesterday'
-            : new Date(toMs(candidate.creationTime)).toLocaleDateString([], { month: 'short', day: 'numeric' });
-
-        const pending: PendingScreenshot = {
-          uri: candidate.uri,
-          id: candidate.id,
-          status: `Analyzing screenshot ${i + 1} of ${totalCount} (${dayLabel})...`,
-          totalCount,
-          currentIndex: i + 1,
-        };
-        setPendingItem(pending);
-        if (optionsRef.current?.onScreenshotDetected) {
-          optionsRef.current.onScreenshotDetected(pending);
+        if (analyzedCount > 0 && currentSettings.enableNotifications && AppState.currentState !== 'active') {
+          await NotificationService.notifyBatchAnalysisCompleted(analyzedCount, lastAnalyzedItem || undefined);
         }
 
-        const result = await processScreenshotInternal(candidate.uri, candidate.id, undefined, {
-          isManualPick: false,
-          silentNotification: true,
-          isBatch: true,
-        });
-
-        if (result && isAppropriateScreenshot(result)) {
-          analyzedCount++;
-          lastAnalyzedItem = result;
+        if (lastAnalyzedItem && optionsRef.current?.onScreenshotAnalyzed) {
+          optionsRef.current.onScreenshotAnalyzed(lastAnalyzedItem, false);
         }
+
+        return analyzedCount;
+      } catch (err) {
+        console.error('Error during batch analysis:', err);
+        return 0;
+      } finally {
+        // Clear in-app progress state
+        setPendingItem(null);
+        setIsAnalyzing(false);
+        isAnalyzingRef.current = false;
+        setAnalysisStatus('');
       }
-
-      // Clear in-app progress state
-      setPendingItem(null);
-      setIsAnalyzing(false);
-      isAnalyzingRef.current = false;
-      setAnalysisStatus('');
-
-      if (analyzedCount > 0 && currentSettings.enableNotifications && AppState.currentState !== 'active') {
-        await NotificationService.notifyBatchAnalysisCompleted(analyzedCount, lastAnalyzedItem || undefined);
-      }
-
-      if (lastAnalyzedItem && optionsRef.current?.onScreenshotAnalyzed) {
-        optionsRef.current.onScreenshotAnalyzed(lastAnalyzedItem, false);
-      }
-
-      return analyzedCount;
     },
     [processScreenshotInternal, processScreenshotUri]
   );
@@ -706,7 +715,10 @@ export function useScreenshotDetector(options?: {
     setErrorMessage,
     bannerError,
     setBannerError,
-    dismissBannerError: () => setBannerError(null),
+    dismissBannerError: () => {
+      setBannerError(null);
+      setErrorMessage(null);
+    },
     resetOfflineState,
     pendingPastScreenshots,
     setPendingPastScreenshots,
@@ -717,9 +729,9 @@ export function useScreenshotDetector(options?: {
     recentScreenshots,
     refreshHistory: loadInitialData,
     processScreenshotUri,
-    triggerScreenshotCheck: () => {
+    triggerScreenshotCheck: async () => {
       resetOfflineState();
-      pollForNewScreenshot(5, 600);
+      await checkForNewScreenshot(true);
     },
     scanRecentScreenshots,
   };

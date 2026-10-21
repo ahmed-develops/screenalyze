@@ -167,6 +167,154 @@
     }
   },
   "user_screenshots": {
-    "user.alpha@screenalyze.ai": []
+    "user.alpha@screenalyze.ai": [],
+    "default@screenalyze.ai": [
+      {
+        "id": "F562DC75-5946-405A-9047-0EF8F1CA17DC/L0/001",
+        "user_email": "default@screenalyze.ai",
+        "image_uri": "ph://F562DC75-5946-405A-9047-0EF8F1CA17DC/L0/001",
+        "captured_at": 1792586587588,
+        "title": "Advertisement for Macro: A Modular App Built in Rust",
+        "category": "social-post",
+        "summary": "This screenshot displays an advertisement for Macro, a modular application that integrates various functionalities such as documents, email, messages, calendar, and CRM into one platform. The app is open source and developed using the Rust programming language, emphasizing its robust and efficient design.",
+        "key_points": [
+          "Macro combines multiple functionalities into a single app.",
+          "The app is open source, allowing for community contributions.",
+          "Built using Rust, highlighting performance and safety.",
+          "Features include docs, email, messages, calendar, and CRM."
+        ],
+        "contextual_actions": [
+          {
+            "id": "action-1",
+            "label": "Create a step-by-step guide to setting up Macro for team collaboration",
+            "badge": "Step-by-Step Tutorial",
+            "type": "tutorial"
+          },
+          {
+            "id": "action-2",
+            "label": "Explain the advantages of using Rust for developing modular applications",
+            "badge": "Concept Explanation",
+            "type": "explanation"
+          },
+          {
+            "id": "action-3",
+            "label": "Break down the architecture of Macro and its integration of multiple services",
+            "badge": "System Breakdown",
+            "type": "diagram"
+          }
+        ],
+        "follow_up_questions": [
+          "What are some real-world examples of Rust's performance benefits?",
+          "How does Rust's concurrency model compare to other languages?",
+          "What challenges might developers face when using Rust for the first time?",
+          "What are the potential challenges of maintaining an open-source project?",
+          "How can businesses leverage Macro for their operations?",
+          "How does Macro ensure data security across its integrated services?",
+          "What are the performance benefits of using Rust in Macro?",
+          "What are the key differences between Macro and other modular apps like Notion?"
+        ],
+        "is_worth_analyzing": true,
+        "image_hash": "08d2510b3efdc29bef580141ada91783ad64bea5734413ca09425dca991aa0da",
+        "asset_id": "F562DC75-5946-405A-9047-0EF8F1CA17DC/L0/001",
+        "is_reviewed": true
+      },
+      {
+        "id": "2FA8C910-4403-4FD9-BA64-D1FFFDC9C094/L0/001",
+        "user_email": "default@screenalyze.ai",
+        "image_uri": "ph://2FA8C910-4403-4FD9-BA64-D1FFFDC9C094/L0/001",
+        "captured_at": 1792587205117,
+        "title": "Guidelines for Building a Real-Time Data Visualization System",
+        "category": "article",
+        "summary": "The screenshot outlines key considerations for creating a dynamic visualization system that updates in real-time with incoming data streams. It emphasizes scalability, latency reduction, and robust error handling, particularly for applications like IoT monitoring where timely insights are crucial.",
+        "key_points": [
+          "Scalability is essential to handle expected data volumes.",
+          "Minimizing latency is crucial for timely data visualization.",
+          "Robust error handling is necessary for network failures and data inconsistencies.",
+          "Real-time data visualization is particularly useful for IoT applications."
+        ],
+        "contextual_actions": [
+          {
+            "id": "action-1",
+            "label": "Create a step-by-step tutorial on implementing real-time data visualization with Matplotlib",
+            "badge": "Step-by-Step Tutorial",
+            "type": "tutorial"
+          },
+          {
+            "id": "action-2",
+            "label": "Explain the trade-offs between scalability and latency in real-time systems",
+            "badge": "Concept Explanation",
+            "type": "explanation"
+          },
+          {
+            "id": "action-3",
+            "label": "Provide a technical breakdown of error handling strategies in data visualization systems",
+            "badge": "System Breakdown",
+            "type": "diagram"
+          }
+        ],
+        "follow_up_questions": [
+          "What specific techniques can be used to minimize latency in data visualization?",
+          "How can machine learning be integrated into real-time data processing?",
+          "What are the challenges of scaling IoT data visualization systems?",
+          "What are the best practices for handling large-scale data streams in visualization?"
+        ],
+        "is_worth_analyzing": true,
+        "image_hash": "39ee5d09a13271b5d6ce1a6d8e528ee06652b89129e7f1e2eb48376fc88d5d79",
+        "asset_id": "2FA8C910-4403-4FD9-BA64-D1FFFDC9C094/L0/001",
+        "is_reviewed": false
+      },
+      {
+        "id": "F61045EA-666F-49B3-ADE2-D7266633E58D/L0/001",
+        "user_email": "default@screenalyze.ai",
+        "image_uri": "file:///var/mobile/Media/DCIM/101APPLE/IMG_1998.PNG",
+        "captured_at": 1792587034841,
+        "title": "Matplotlib Code for Plotting Temperature Trajectories and Safety Breaches",
+        "category": "code",
+        "summary": "This code snippet uses Matplotlib to create a series of plots that visualize temperature trajectories and safety breaches. It sets up a figure with three subplots, plotting static and RLHF-RLCD trajectories with specific colors and labels. The code also includes horizontal and vertical lines to indicate setpoints and safety bounds.",
+        "key_points": [
+          "Uses Matplotlib to create subplots for visualizing data.",
+          "Plots temperature trajectories with specific colors and labels.",
+          "Includes horizontal and vertical lines for setpoints and safety bounds.",
+          "Displays a bar chart for total safety breaches."
+        ],
+        "contextual_actions": [
+          {
+            "id": "action-1",
+            "label": "Create a step-by-step tutorial for plotting temperature trajectories with Matplotlib",
+            "badge": "Step-by-Step Tutorial",
+            "type": "tutorial"
+          },
+          {
+            "id": "action-2",
+            "label": "Explain the significance of using axhline and axvline in this plot",
+            "badge": "Concept Explanation",
+            "type": "explanation"
+          },
+          {
+            "id": "action-3",
+            "label": "Break down the implementation of subplots and their configuration",
+            "badge": "System Breakdown",
+            "type": "diagram"
+          }
+        ],
+        "follow_up_questions": [
+          "How can I ensure data security in real-time streaming applications?",
+          "What are the differences between batch processing and stream processing?",
+          "How do I choose the right stream processing framework for my use case?",
+          "How can I optimize the performance of real-time data visualization?",
+          "How can I integrate machine learning models into real-time data processing?",
+          "How can I deploy this analysis to a cloud platform?",
+          "What are some common challenges in IoT data analysis?",
+          "How can you modify the code to add more trajectories?",
+          "What are the implications of changing the ylim values in the plots?",
+          "How does the choice of colors impact the readability of the plots?",
+          "What additional data could be visualized alongside the current plots?"
+        ],
+        "is_worth_analyzing": true,
+        "image_hash": "b38ce1f1f58543857767c650f7dbfa4b20e5fe49bb91ca043666053f03b1928e",
+        "asset_id": "F61045EA-666F-49B3-ADE2-D7266633E58D/L0/001",
+        "is_reviewed": true
+      }
+    ]
   }
 }

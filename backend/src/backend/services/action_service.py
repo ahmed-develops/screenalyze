@@ -60,13 +60,13 @@ INSTRUCTIONS:
 2. If this is a tutorial request, include learning objectives, architecture stack, implementation steps with realistic code snippets, and production considerations.
 3. If this is a question, explain concepts thoroughly with intuitive analogies, architectural trade-offs, and examples.
 4. Format the entire response in clean GitHub Markdown (use headers, bold text, bullet points, and code blocks).
-5. AT THE VERY END OF YOUR RESPONSE, append a JSON block with exactly 3 next logical follow-up questions:
+5. AT THE VERY END OF YOUR RESPONSE, append a JSON block with exactly 3 next logical, concise follow-up questions (keep them punchy, under 8 words each, so they fit neatly in mobile suggestion pills):
 ```json
 {{
   "nextFollowUps": [
-    "Next logical follow-up question 1",
-    "Next logical follow-up question 2",
-    "Next logical follow-up question 3"
+    "Next concise follow-up question 1",
+    "Next concise follow-up question 2",
+    "Next concise follow-up question 3"
   ]
 }}
 ```"""

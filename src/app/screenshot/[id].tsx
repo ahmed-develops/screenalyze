@@ -26,6 +26,7 @@ import {
   HelpCircle,
   Send,
   ChevronLeft,
+  ChevronRight,
   Copy,
   Check,
   Plus,
@@ -620,8 +621,15 @@ export default function ScreenshotDetailScreen() {
                                 disabled={executingPrompt !== null}
                                 onPress={() => handleExecute(screenshot, nextQ)}
                               >
-                                {/* <Sparkles size={13} color={Colors.accent} /> */}
-                                <Text style={styles.followUpChipText}>{nextQ}</Text>
+                                <Sparkles size={12} color={Colors.accent} />
+                                <Text
+                                  style={styles.followUpChipText}
+                                  numberOfLines={1}
+                                  ellipsizeMode="tail"
+                                >
+                                  {nextQ}
+                                </Text>
+                                <ChevronRight size={13} color="rgba(6, 182, 212, 0.7)" />
                               </TouchableOpacity>
                             ))}
                           </View>
@@ -644,7 +652,13 @@ export default function ScreenshotDetailScreen() {
                 <ActivityIndicator size="small" color={Colors.accent} />
                 <View style={styles.thinkingTextCol}>
                   <Text style={styles.thinkingTitle}>Thinking...</Text>
-                  <Text style={styles.thinkingSubtitle}>Analyzing visual context & writing answer</Text>
+                  <Text
+                    style={styles.thinkingSubtitle}
+                    numberOfLines={1}
+                    ellipsizeMode="tail"
+                  >
+                    Analyzing visual context & writing answer
+                  </Text>
                 </View>
               </View>
             </View>
@@ -667,7 +681,11 @@ export default function ScreenshotDetailScreen() {
                   onPress={() => handleExecute(screenshot, q)}
                 >
                   <HelpCircle size={13} color={Colors.accent} />
-                  <Text style={styles.quickBarChipText} numberOfLines={1}>
+                  <Text
+                    style={styles.quickBarChipText}
+                    numberOfLines={1}
+                    ellipsizeMode="tail"
+                  >
                     {q}
                   </Text>
                 </TouchableOpacity>
@@ -1232,22 +1250,24 @@ const styles = StyleSheet.create({
   followUpChip: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 7,
+    gap: 8,
     backgroundColor: 'rgba(6, 182, 212, 0.10)',
-    paddingHorizontal: 10,
-    paddingVertical: 7,
-    borderRadius: 9,
+    paddingHorizontal: 12,
+    paddingVertical: 9,
+    borderRadius: 20,
     borderWidth: 1,
-    borderColor: 'rgba(6, 182, 212, 0.20)',
+    borderColor: 'rgba(6, 182, 212, 0.25)',
   },
   followUpChipText: {
     fontSize: 12,
     fontWeight: '600',
     color: '#ffffff',
     flex: 1,
+    flexShrink: 1,
     lineHeight: 16,
   },
   thinkingBubble: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
@@ -1261,6 +1281,7 @@ const styles = StyleSheet.create({
   },
   thinkingTextCol: {
     flex: 1,
+    flexShrink: 1,
   },
   thinkingTitle: {
     fontSize: 12,
@@ -1271,6 +1292,7 @@ const styles = StyleSheet.create({
     fontSize: 10,
     color: Colors.textSecondary,
     marginTop: 1,
+    flexShrink: 1,
   },
   quickBarContainer: {
     paddingVertical: 6,
@@ -1289,15 +1311,16 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255, 255, 255, 0.08)',
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.14)',
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 14,
-    maxWidth: 240,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 16,
+    maxWidth: 280,
   },
   quickBarChipText: {
     fontSize: 11,
     color: '#ffffff',
     fontWeight: '500',
+    flexShrink: 1,
   },
   inputBarWrapper: {
     flexDirection: 'row',
