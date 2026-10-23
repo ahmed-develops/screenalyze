@@ -351,6 +351,22 @@
       "reason": "The screenshot contains a technical tutorial on data visualization with actionable insights and links for further exploration.",
       "image_hash": "39ee5d09a13271b5d6ce1a6d8e528ee06652b89129e7f1e2eb48376fc88d5d79",
       "cached": false
+    },
+    "0658769c9eb5127aa0aced4c2406a2944346693a6900c3326d4cdde1f6cce073": {
+      "is_worth_analyzing": true,
+      "category": "code",
+      "confidence": 0.9,
+      "reason": "The screenshot contains a code snippet related to Python, which is valuable for developers and learners.",
+      "image_hash": "0658769c9eb5127aa0aced4c2406a2944346693a6900c3326d4cdde1f6cce073",
+      "cached": false
+    },
+    "d059a9b5880d2a51543b322196a736e0cc3ccb981a95cfd6b363a285626a8b65": {
+      "is_worth_analyzing": true,
+      "category": "social-post",
+      "confidence": 0.85,
+      "reason": "The post highlights a professional achievement and recognition in the field of education, making it relevant for knowledge workers.",
+      "image_hash": "d059a9b5880d2a51543b322196a736e0cc3ccb981a95cfd6b363a285626a8b65",
+      "cached": false
     }
   },
   "analyses": {
@@ -1632,6 +1648,86 @@
       ],
       "is_worth_analyzing": true,
       "image_hash": "39ee5d09a13271b5d6ce1a6d8e528ee06652b89129e7f1e2eb48376fc88d5d79",
+      "already_analyzed": false
+    },
+    "0658769c9eb5127aa0aced4c2406a2944346693a6900c3326d4cdde1f6cce073": {
+      "title": "Filtered Screenshot of Python Code for Sensor Fault Detection",
+      "category": "code",
+      "summary": "The screenshot displays a filtered view of a Python code snippet related to sensor fault detection. The code appears to involve calculations for drift bias and temperature correction. The interface also shows tools for tutorials, code generation, token audits, and UX heuristics.",
+      "key_points": [
+        "The code snippet is focused on sensor fault detection.",
+        "Drift bias and temperature correction are key components of the code.",
+        "The interface includes tools for tutorials and code generation.",
+        "UX heuristics and token audits are also available as tools."
+      ],
+      "contextual_actions": [
+        {
+          "id": "action-1",
+          "label": "Create a step-by-step tutorial for implementing sensor fault detection in Python",
+          "badge": "Step-by-Step Tutorial",
+          "type": "tutorial"
+        },
+        {
+          "id": "action-2",
+          "label": "Explain the drift bias calculation and its impact on sensor accuracy",
+          "badge": "Concept Explanation",
+          "type": "explanation"
+        },
+        {
+          "id": "action-3",
+          "label": "Break down the Python code structure for sensor fault detection",
+          "badge": "System Breakdown",
+          "type": "diagram"
+        }
+      ],
+      "follow_up_questions": [
+        "How does the drift bias affect sensor readings over time?",
+        "What are the best practices for implementing fault detection in Python?",
+        "How can UX heuristics improve the usability of sensor data applications?",
+        "What role do token audits play in maintaining code quality?"
+      ],
+      "is_worth_analyzing": true,
+      "image_hash": "0658769c9eb5127aa0aced4c2406a2944346693a6900c3326d4cdde1f6cce073",
+      "already_analyzed": false
+    },
+    "d059a9b5880d2a51543b322196a736e0cc3ccb981a95cfd6b363a285626a8b65": {
+      "title": "Recognition of Shoaib Raza as Best Campus Teacher at FAST-NUCES Karachi",
+      "category": "social-post",
+      "summary": "The FAST-NUCES Karachi Campus congratulates Shoaib Raza, a lecturer in the Department of Cyber Security, for receiving the Best Campus Teacher Award for 2025-26. This accolade highlights his dedication to education, mentorship, and nurturing future cybersecurity professionals.",
+      "key_points": [
+        "Shoaib Raza receives the Best Campus Teacher Award.",
+        "Award given by FAST-NUCES Karachi Campus.",
+        "Recognition for contributions to cybersecurity education.",
+        "Emphasis on mentorship and professional development."
+      ],
+      "contextual_actions": [
+        {
+          "id": "action-1",
+          "label": "Explore Shoaib Raza's teaching methodologies in cybersecurity",
+          "badge": "Step-by-Step Tutorial",
+          "type": "tutorial"
+        },
+        {
+          "id": "action-2",
+          "label": "Discuss the impact of awards on academic motivation and performance",
+          "badge": "Concept Explanation",
+          "type": "explanation"
+        },
+        {
+          "id": "action-3",
+          "label": "Analyze the role of mentorship in cybersecurity education",
+          "badge": "System Breakdown",
+          "type": "diagram"
+        }
+      ],
+      "follow_up_questions": [
+        "What criteria are used to select the Best Campus Teacher at FAST-NUCES?",
+        "How does Shoaib Raza integrate practical cybersecurity skills into his curriculum?",
+        "What initiatives has Shoaib Raza led to enhance cybersecurity education?",
+        "How does this award influence the career trajectory of educators at FAST-NUCES?"
+      ],
+      "is_worth_analyzing": true,
+      "image_hash": "d059a9b5880d2a51543b322196a736e0cc3ccb981a95cfd6b363a285626a8b65",
       "already_analyzed": false
     }
   }

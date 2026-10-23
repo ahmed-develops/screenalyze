@@ -34,7 +34,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="Screenalyze AI Backend",
     version="1.0.0",
-    description="Python FastAPI backend powering multimodal GPT-4o vision, categorization gatekeeping, masterclass tutorials, and user management for Screenalyze.",
+    description="Python FastAPI backend powering multimodal Sol vision, categorization gatekeeping, masterclass tutorials, and user management for Screenalyze.",
     lifespan=lifespan,
 )
 

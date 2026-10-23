@@ -83,7 +83,7 @@ export const AIService = {
   },
 
   /**
-   * Multimodal analysis of screenshot using OpenAI GPT-4o.
+   * Multimodal analysis of screenshot using Sol.
    * Delegates directly to FastAPI backend (POST /api/v1/screenshots/analyze).
    */
   async analyzeScreenshot(

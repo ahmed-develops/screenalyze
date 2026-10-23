@@ -63,7 +63,7 @@ class VisionService:
         Evaluates whether a screenshot contains actionable/knowledge content
         (e.g. LinkedIn post, code, architecture slide, article, UI design)
         vs. personal/non-actionable photos (selfie, family, food, meme, blurry camera shot).
-        Uses low-detail gpt-4o-mini (~85 tokens) for sub-second, cost-effective evaluation.
+        Uses low-detail luna (~85 tokens) for sub-second, cost-effective evaluation.
         """
         cleaned_b64 = _clean_base64(image_base64)
         img_hash = _compute_image_hash(cleaned_b64)
@@ -105,7 +105,7 @@ Return a valid JSON object matching this schema (do NOT include markdown code fe
 
         try:
             response = await self.client.chat.completions.create(
-                model="gpt-4o-mini",
+                model=settings.model_luna,
                 messages=[
                     {
                         "role": "system",
@@ -126,8 +126,7 @@ Return a valid JSON object matching this schema (do NOT include markdown code fe
                     },
                 ],
                 response_format={"type": "json_object"},
-                temperature=0.1,
-                max_tokens=220,
+                max_completion_tokens=220,
             )
 
             raw_text = response.choices[0].message.content or "{}"
@@ -168,7 +167,7 @@ Return a valid JSON object matching this schema (do NOT include markdown code fe
         force_reanalyze: bool = False,
     ) -> AnalyzeResponse:
         """
-        Multimodal visual analysis of screenshot using OpenAI GPT-4o.
+        Multimodal visual analysis of screenshot using Sol.
         Generates structured summary, key points, contextual action buttons, and follow-up questions.
         Caches results persistently by SHA-256 hash to eliminate redundant analysis.
         """
@@ -228,7 +227,7 @@ CRITICAL RULES:
 - Provide 3 to 4 follow_up_questions that an inquisitive learner or engineer would ask."""
 
         response = await self.client.chat.completions.create(
-            model="gpt-4o",
+            model=settings.model_sol,
             messages=[
                 {
                     "role": "system",
@@ -249,8 +248,7 @@ CRITICAL RULES:
                 },
             ],
             response_format={"type": "json_object"},
-            temperature=0.2,
-            max_tokens=1600,
+            max_completion_tokens=1600,
         )
 
         raw_text = response.choices[0].message.content or "{}"

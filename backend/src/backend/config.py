@@ -27,6 +27,10 @@ class Settings(BaseSettings):
     mongodb_uri: str = Field(default="", alias="MONGODB_URI")
     mongodb_db_name: str = Field(default="screenalyze", alias="MONGODB_DB_NAME")
 
+    # AI Model Configuration (gpt-5.6-sol & gpt-5.6-luna)
+    model_sol: str = Field(default="gpt-5.6-sol", alias="MODEL_SOL")
+    model_luna: str = Field(default="gpt-5.6-luna", alias="MODEL_LUNA")
+
     model_config = SettingsConfigDict(
         env_file=(str(ROOT_DIR / ".env"), str(PARENT_ROOT_DIR / ".env")),
         env_file_encoding="utf-8",

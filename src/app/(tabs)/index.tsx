@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useMemo } from 'react';
+import React, { useState, useCallback, useMemo, useEffect } from 'react';
 import {
   View,
   Text,
@@ -9,7 +9,8 @@ import {
   Alert,
   TextInput,
   Dimensions,
-  RefreshControl,
+  Animated,
+  Easing,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router, useFocusEffect } from 'expo-router';
@@ -31,6 +32,7 @@ import {
   RefreshCw,
   BookOpen,
   Code2,
+  Sparkles,
 } from 'lucide-react-native';
 import { useScreenshotDetector } from '../../hooks/useScreenshotDetector';
 import type { RetrievedPhoto } from '../../services/mediaService';
@@ -38,11 +40,17 @@ import { StorageService } from '../../services/storageService';
 import { ApiClient } from '../../services/apiClient';
 import { ActionPickerModal } from '../../components/ActionPickerModal';
 import { ScreenshotPickerModal } from '../../components/ScreenshotPickerModal';
+import { AnalysisSummaryModal } from '../../components/AnalysisSummaryModal';
 import { computeFastImageHash } from '../../utils/crypto';
 import { NotificationBanner } from '../../components/NotificationBanner';
 import { BackTapGuideModal } from '../../components/BackTapGuideModal';
 import { PastScreenshotsPromptModal } from '../../components/PastScreenshotsPromptModal';
-import { ScreenshotAnalysis, UserProfile, isAppropriateScreenshot } from '../../types';
+import {
+  ScreenshotAnalysis,
+  UserProfile,
+  isAppropriateScreenshot,
+  BatchAnalysisSummary,
+} from '../../types';
 import { getInappropriateScreenshotError } from '../../utils/errorUtils';
 import { StitchTheme } from '../../theme/stitchTheme';
 import { useTheme } from '../../theme/ThemeContext';
@@ -117,6 +125,8 @@ export default function HomeSummaryScreen() {
   const [isScreenshotPickerVisible, setIsScreenshotPickerVisible] = useState(false);
   const [isPastPromptVisible, setIsPastPromptVisible] = useState(false);
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
+  const [batchSummary, setBatchSummary] = useState<BatchAnalysisSummary | null>(null);
+  const [isSummaryModalVisible, setIsSummaryModalVisible] = useState(false);
 
   const {
     isAnalyzing,
@@ -133,6 +143,7 @@ export default function HomeSummaryScreen() {
     refreshHistory,
     processScreenshotUri,
     triggerScreenshotCheck,
+    lastBatchSummary,
   } = useScreenshotDetector({
     onScreenshotDetected: () => {
       setBannerItem(null);
@@ -147,6 +158,10 @@ export default function HomeSummaryScreen() {
     },
     onPastScreenshotsPending: () => {
       setIsPastPromptVisible(true);
+    },
+    onBatchAnalysisCompleted: (summary) => {
+      setBatchSummary(summary);
+      setIsSummaryModalVisible(true);
     },
     onAnalysisError: (error, isManualPick) => {
       if (error.isInappropriate && isManualPick) {
@@ -193,6 +208,37 @@ export default function HomeSummaryScreen() {
     }
   };
 
+  const [spinAnim] = useState(() => new Animated.Value(0));
+
+  useEffect(() => {
+    if (refreshing) {
+      spinAnim.setValue(0);
+      const loop = Animated.loop(
+        Animated.timing(spinAnim, {
+          toValue: 1,
+          duration: 850,
+          easing: Easing.linear,
+          useNativeDriver: true,
+        })
+      );
+      loop.start();
+      return () => {
+        loop.stop();
+      };
+    } else {
+      spinAnim.setValue(0);
+    }
+  }, [refreshing, spinAnim]);
+
+  const spin = useMemo(
+    () =>
+      spinAnim.interpolate({
+        inputRange: [0, 1],
+        outputRange: ['0deg', '360deg'],
+      }),
+    [spinAnim]
+  );
+
   const analyzedIds = useMemo(
     () => new Set(recentScreenshots.map((s) => s.id)),
     [recentScreenshots]
@@ -207,6 +253,14 @@ export default function HomeSummaryScreen() {
     await analyzePastScreenshots();
   }, [analyzePastScreenshots]);
 
+  const handleAnalyzeSelectedPastScreenshots = useCallback(
+    async (selected: RetrievedPhoto[]) => {
+      setIsPastPromptVisible(false);
+      await analyzePastScreenshots(selected);
+    },
+    [analyzePastScreenshots]
+  );
+
   const handleSelectPastScreenshotsManually = useCallback(() => {
     setIsPastPromptVisible(false);
     setIsScreenshotPickerVisible(true);
@@ -216,6 +270,7 @@ export default function HomeSummaryScreen() {
     setIsPastPromptVisible(false);
     dismissPastScreenshotsPrompt();
   }, [dismissPastScreenshotsPrompt]);
+
 
   const handleScreenshotSelected = useCallback(
     async (picked: RetrievedPhoto) => {
@@ -299,7 +354,21 @@ export default function HomeSummaryScreen() {
     [processScreenshotUri, resetOfflineState]
   );
 
+  const handleMultipleScreenshotsSelected = useCallback(
+    async (pickedList: RetrievedPhoto[]) => {
+      if (!pickedList || pickedList.length === 0) return;
+      if (pickedList.length === 1) {
+        await handleScreenshotSelected(pickedList[0]);
+      } else {
+        // Run batch analysis on the multiple selected screenshots
+        await analyzePastScreenshots(pickedList);
+      }
+    },
+    [handleScreenshotSelected, analyzePastScreenshots]
+  );
+
   const handleActionComplete = (updated: ScreenshotAnalysis) => {
+
     setModalItem(null);
     setBannerItem(null);
     refreshHistory();
@@ -458,15 +527,6 @@ export default function HomeSummaryScreen() {
           ]}
           showsVerticalScrollIndicator={false}
           bounces={true}
-          alwaysBounceVertical={true}
-          refreshControl={
-            <RefreshControl
-              refreshing={refreshing}
-              onRefresh={onRefresh}
-              tintColor={StitchTheme.colors.secondary}
-              colors={[StitchTheme.colors.secondary, StitchTheme.colors.primary]}
-            />
-          }
         >
           {/* Integrated Transparent Top Bar (Profile & Reload) */}
           <View style={styles.headerBar}>
@@ -486,11 +546,9 @@ export default function HomeSummaryScreen() {
               disabled={refreshing}
               accessibilityLabel="Refresh screenshots"
             >
-              {refreshing ? (
-                <ActivityIndicator size="small" color="#ffffff" />
-              ) : (
+              <Animated.View style={{ transform: [{ rotate: spin }] }}>
                 <RefreshCw size={17} color="#ffffff" />
-              )}
+              </Animated.View>
             </TouchableOpacity>
           </View>
 
@@ -526,10 +584,27 @@ export default function HomeSummaryScreen() {
                 <Text style={styles.statBadgeLabel}>{uiFlowsCount} UI Flows</Text>
               </View>
 
-              {/* <View style={styles.statBadge}>
-                <Cpu size={15} color={StitchTheme.colors.primary} />
-                <Text style={styles.statBadgeLabel}>Vision</Text>
-              </View> */}
+              {(batchSummary || lastBatchSummary) && (
+                <TouchableOpacity
+                  style={[
+                    styles.statBadge,
+                    {
+                      backgroundColor: 'rgba(99, 102, 241, 0.16)',
+                      borderColor: 'rgba(99, 102, 241, 0.35)',
+                    },
+                  ]}
+                  onPress={() => {
+                    setBatchSummary(batchSummary || lastBatchSummary);
+                    setIsSummaryModalVisible(true);
+                  }}
+                  activeOpacity={0.7}
+                >
+                  <Sparkles size={14} color="#818CF8" />
+                  <Text style={[styles.statBadgeLabel, { color: '#C7D2FE', fontWeight: '700' }]}>
+                    Summary ({(batchSummary || lastBatchSummary)?.analyzedCount}/{(batchSummary || lastBatchSummary)?.total})
+                  </Text>
+                </TouchableOpacity>
+              )}
             </ScrollView>
           </View>
 
@@ -992,17 +1067,36 @@ export default function HomeSummaryScreen() {
           visible={isScreenshotPickerVisible}
           onClose={() => setIsScreenshotPickerVisible(false)}
           onSelectScreenshot={handleScreenshotSelected}
+          onSelectMultipleScreenshots={handleMultipleScreenshotsSelected}
           analyzedIds={analyzedIds}
         />
+
 
         {/* Past Unanalyzed Screenshots Prompt Modal */}
         <PastScreenshotsPromptModal
           visible={isPastPromptVisible && pendingPastScreenshots.length > 0}
           pastScreenshots={pendingPastScreenshots}
+          onAnalyzeSelected={handleAnalyzeSelectedPastScreenshots}
           onAutoAnalyzeAll={handleAutoAnalyzePastScreenshots}
           onSelectManually={handleSelectPastScreenshotsManually}
           onDismiss={handleDismissPastPrompt}
         />
+
+        {/* Analysis Summary Breakdown Modal */}
+        <AnalysisSummaryModal
+          visible={isSummaryModalVisible && Boolean(batchSummary || lastBatchSummary)}
+          summary={batchSummary || lastBatchSummary}
+          onClose={() => {
+            setIsSummaryModalVisible(false);
+            setBatchSummary(null);
+          }}
+          onSelectScreenshot={(analysis) => {
+            setIsSummaryModalVisible(false);
+            setBatchSummary(null);
+            setModalItem(analysis);
+          }}
+        />
+
       </SafeAreaView>
     </View>
   );

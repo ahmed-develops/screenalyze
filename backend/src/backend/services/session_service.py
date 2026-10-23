@@ -355,20 +355,19 @@ For instance:
 Format your output in clean Markdown with appropriate code blocks and clear sections."""
 
         ai_res = await action_service.client.chat.completions.create(
-            model="gpt-4o",
+            model=settings.model_sol,
             messages=[
                 {"role": "system", "content": "You are an intelligent workflow automation engine and MCP orchestrator."},
                 {"role": "user", "content": execution_prompt},
             ],
-            temperature=0.3,
-            max_tokens=2000,
+            max_completion_tokens=2000,
         )
 
         output_content = ai_res.choices[0].message.content or "Workflow execution completed."
 
         logs.extend([
             "[PIPELINE] Extracted visual tokens and architectural constraints",
-            "[AI_ENGINE] GPT-4o synthesized integration artifacts and schemas",
+            "[AI_ENGINE] Sol synthesized integration artifacts and schemas",
             "[MCP_CONNECTOR] Dispatched payload through simulated protocol bridge",
             "[STATUS] Workflow execution completed successfully with 100% test verification",
         ])

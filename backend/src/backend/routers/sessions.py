@@ -108,7 +108,7 @@ async def get_session_workflows(session_id: str) -> list[WorkflowSuggestion]:
 @router.post(
     "/api/v1/sessions/{session_id}/prompt",
     response_model=SessionPromptResponse,
-    summary="Execute prompt on screenshot in web session via GPT-4o",
+    summary="Execute prompt on screenshot in web session via Sol",
 )
 async def execute_session_prompt(session_id: str, req: SessionPromptRequest) -> SessionPromptResponse:
     try:

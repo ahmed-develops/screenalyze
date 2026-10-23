@@ -292,7 +292,7 @@ export default function AutoAnalyzeScreen() {
                 <View style={styles.loaderRow}>
                   <ActivityIndicator size="small" color={colors.primary} />
                   <Text style={[styles.liveBadge, { color: colors.primary }]}>
-                    GPT-4o Processing
+                    Sol Processing
                   </Text>
                 </View>
               )}

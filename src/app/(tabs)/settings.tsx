@@ -39,7 +39,9 @@ import {
   Mail,
   Moon,
   Filter,
+  History,
 } from 'lucide-react-native';
+
 import { StorageService, DEFAULT_USER_PROFILE } from '../../services/storageService';
 import { NotificationService } from '../../services/notificationService';
 import { ApiClient } from '../../services/apiClient';
@@ -144,6 +146,12 @@ export default function SettingsScreen() {
     const updated = await StorageService.saveSettings({ enableNotifications: val });
     setSettings(updated);
   };
+
+  const handleTogglePromptPastScreenshots = async (val: boolean) => {
+    const updated = await StorageService.saveSettings({ promptPastScreenshotsEnabled: val });
+    setSettings(updated);
+  };
+
 
   const handleToggleDailyNudge = async (val: boolean) => {
     const updated = await StorageService.saveSettings({ dailyNudgeEnabled: val });
@@ -895,8 +903,37 @@ export default function SettingsScreen() {
                   thumbColor="#FFFFFF"
                 />
               </View>
+
+              <View
+                style={[
+                  styles.rowDivider,
+                  { backgroundColor: isDark ? 'rgba(255, 255, 255, 0.05)' : colors.border },
+                ]}
+              />
+
+              {/* Past Screenshots Reminder */}
+              <View style={styles.rowItem}>
+                <View style={[styles.rowIconCircle, { backgroundColor: 'rgba(99, 102, 241, 0.15)' }]}>
+                  <History size={16} color={colors.primary} />
+                </View>
+                <View style={styles.rowContent}>
+                  <Text style={[styles.rowTitle, { color: colors.textPrimary }]}>
+                    Past Screenshots Reminder
+                  </Text>
+                  <Text style={[styles.rowSubtitle, { color: colors.textSecondary }]}>
+                    Prompt to analyze unvisited screenshots from previous days when launching the app
+                  </Text>
+                </View>
+                <Switch
+                  value={settings.promptPastScreenshotsEnabled !== false}
+                  onValueChange={handleTogglePromptPastScreenshots}
+                  trackColor={{ false: colors.surfaceSubtle, true: colors.primary }}
+                  thumbColor="#FFFFFF"
+                />
+              </View>
             </View>
           </View>
+
 
           {/* 5. Group: Storage & Data Management */}
           <View style={styles.groupContainer}>

@@ -66,7 +66,7 @@ async def delete_screenshot(
 )
 async def classify_screenshot(req: ClassifyRequest) -> ClassifyResponse:
     """
-    Sub-second classification of screenshot using gpt-4o-mini with low detail.
+    Sub-second classification of screenshot using luna with low detail.
     Evaluates whether the photo contains actionable content (LinkedIn post, code,
     architecture diagram, article, UI design) vs. personal/non-actionable photos.
     """
@@ -87,14 +87,14 @@ async def classify_screenshot(req: ClassifyRequest) -> ClassifyResponse:
 @router.post(
     "/analyze",
     response_model=AnalyzeResponse,
-    summary="Multimodal visual analysis with GPT-4o",
+    summary="Multimodal visual analysis with Sol",
 )
 async def analyze_screenshot(
     req: AnalyzeRequest,
     user: Optional[UserProfile] = Depends(get_optional_user),
 ) -> AnalyzeResponse:
     """
-    Analyzes visual content deeply using GPT-4o vision.
+    Analyzes visual content deeply using Sol vision.
     Produces structured title, category, summary, key points, contextual actions,
     and follow-up questions.
     """

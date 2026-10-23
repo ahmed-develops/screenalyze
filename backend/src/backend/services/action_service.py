@@ -72,7 +72,7 @@ INSTRUCTIONS:
 ```"""
 
         response = await self.client.chat.completions.create(
-            model="gpt-4o",
+            model=settings.model_sol,
             messages=[
                 {
                     "role": "system",
@@ -80,8 +80,7 @@ INSTRUCTIONS:
                 },
                 {"role": "user", "content": full_prompt},
             ],
-            temperature=0.35,
-            max_tokens=2800,
+            max_completion_tokens=2800,
         )
 
         raw_content = response.choices[0].message.content or ""

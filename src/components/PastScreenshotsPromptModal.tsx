@@ -1,27 +1,30 @@
-import React from 'react';
+import React, { useState, useCallback } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   Modal,
   TouchableOpacity,
+  ScrollView,
 } from 'react-native';
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import {
   History,
   Sparkles,
-  SlidersHorizontal,
   X,
+  Check,
 } from 'lucide-react-native';
 import { RetrievedPhoto } from '../services/mediaService';
+import { StorageService } from '../services/storageService';
 import { useTheme } from '../theme/ThemeContext';
 
 export interface PastScreenshotsPromptModalProps {
   visible: boolean;
   pastScreenshots: RetrievedPhoto[];
-  onAutoAnalyzeAll: () => void;
-  onSelectManually: () => void;
+  onAutoAnalyzeAll?: () => void;
+  onAnalyzeSelected?: (selected: RetrievedPhoto[]) => void;
+  onSelectManually?: () => void;
   onDismiss: () => void;
 }
 
@@ -42,27 +45,73 @@ export const PastScreenshotsPromptModal: React.FC<PastScreenshotsPromptModalProp
   visible,
   pastScreenshots,
   onAutoAnalyzeAll,
-  onSelectManually,
+  onAnalyzeSelected,
   onDismiss,
 }) => {
   const { colors, isDark } = useTheme();
+
+  // Track deselected IDs (by default empty, so all past screenshots are pre-selected)
+  const [deselectedIds, setDeselectedIds] = useState<Set<string>>(() => new Set());
+  const [dontRemindAgain, setDontRemindAgain] = useState(false);
+
   const count = pastScreenshots.length;
-  const previewList = pastScreenshots.slice(0, 4);
-  const remainingCount = count > 4 ? count - 4 : 0;
+  const selectedPhotos = pastScreenshots.filter((s) => !deselectedIds.has(s.id));
+  const selectedCount = selectedPhotos.length;
+  const isAllSelected = deselectedIds.size === 0 && count > 0;
+
+  const toggleSelect = useCallback((id: string) => {
+    setDeselectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
+  }, []);
+
+  const toggleSelectAll = useCallback(() => {
+    if (deselectedIds.size === 0) {
+      setDeselectedIds(new Set(pastScreenshots.map((s) => s.id)));
+    } else {
+      setDeselectedIds(new Set());
+    }
+  }, [deselectedIds.size, pastScreenshots]);
+
+  const handleAnalyze = useCallback(async () => {
+    if (dontRemindAgain) {
+      await StorageService.saveSettings({ promptPastScreenshotsEnabled: false });
+    }
+
+    if (onAnalyzeSelected) {
+      onAnalyzeSelected(selectedPhotos);
+    } else if (onAutoAnalyzeAll) {
+      onAutoAnalyzeAll();
+    }
+  }, [dontRemindAgain, selectedPhotos, onAnalyzeSelected, onAutoAnalyzeAll]);
+
+  const handleDismiss = useCallback(async () => {
+    if (dontRemindAgain) {
+      await StorageService.saveSettings({ promptPastScreenshotsEnabled: false });
+    }
+    onDismiss();
+  }, [dontRemindAgain, onDismiss]);
+
 
   return (
     <Modal
       visible={visible}
       transparent
       animationType="fade"
-      onRequestClose={onDismiss}
+      onRequestClose={handleDismiss}
     >
       <View style={styles.backdrop}>
         <View
           style={[
             styles.modalContainer,
             {
-              backgroundColor: isDark ? 'rgba(23, 26, 33, 0.96)' : colors.card,
+              backgroundColor: isDark ? 'rgba(23, 26, 33, 0.98)' : colors.card,
               borderColor: isDark ? 'rgba(255, 255, 255, 0.12)' : colors.border,
             },
           ]}
@@ -83,86 +132,146 @@ export const PastScreenshotsPromptModal: React.FC<PastScreenshotsPromptModalProp
                   Past Screenshots
                 </Text>
                 <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
-                  {count} pending from previous days
+                  {count} unanalyzed from previous days
                 </Text>
               </View>
             </View>
             <TouchableOpacity
               style={styles.closeBtn}
-              onPress={onDismiss}
+              onPress={handleDismiss}
               hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
             >
               <X size={18} color={colors.textMuted} />
             </TouchableOpacity>
           </View>
 
-          {/* Body Description */}
+          {/* Description */}
           <Text style={[styles.description, { color: colors.textSecondary }]}>
-            You have {count} screenshot{count > 1 ? 's' : ''} captured on days when the app wasn&apos;t opened.
-            How would you like to process them?
+            Select screenshots captured when the app wasn&apos;t open to analyze them now:
           </Text>
 
-          {/* Mini Preview Thumbnails */}
-          {previewList.length > 0 && (
-            <View style={styles.previewContainer}>
-              <View style={styles.previewRow}>
-                {previewList.map((item, index) => (
-                  <View key={item.id || index} style={styles.thumbnailWrapper}>
-                    <Image
-                      source={{ uri: item.uri }}
-                      style={styles.thumbnail}
-                      contentFit="cover"
-                    />
-                    <View style={styles.thumbnailDateBadge}>
-                      <Text style={styles.thumbnailDateText}>
-                        {formatRelativeDate(item.creationTime)}
-                      </Text>
-                    </View>
-                  </View>
-                ))}
-                {remainingCount > 0 && (
+          {/* Selection Control Bar */}
+          <View style={styles.selectionBar}>
+            <Text style={[styles.selectionCountText, { color: colors.textPrimary }]}>
+              Selected: <Text style={{ color: colors.primary, fontWeight: '700' }}>{selectedCount}</Text> of {count}
+            </Text>
+            <TouchableOpacity
+              style={[
+                styles.selectAllBtn,
+                {
+                  backgroundColor: isDark ? 'rgba(255, 255, 255, 0.08)' : colors.surfaceSubtle,
+                  borderColor: isDark ? 'rgba(255, 255, 255, 0.15)' : colors.border,
+                },
+              ]}
+              onPress={toggleSelectAll}
+              activeOpacity={0.7}
+            >
+              <Text style={[styles.selectAllText, { color: colors.primary }]}>
+                {isAllSelected ? 'Deselect All' : 'Select All'}
+              </Text>
+            </TouchableOpacity>
+          </View>
+
+          {/* Horizontal Multi-Select Carousel */}
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.thumbnailsScrollContent}
+            style={styles.thumbnailsScroll}
+          >
+            {pastScreenshots.map((item) => {
+              const isSelected = !deselectedIds.has(item.id);
+              return (
+                <TouchableOpacity
+                  key={item.id}
+                  style={[
+                    styles.thumbnailCard,
+                    {
+                      borderColor: isSelected
+                        ? colors.primary
+                        : isDark
+                        ? 'rgba(255, 255, 255, 0.1)'
+                        : colors.border,
+                      borderWidth: isSelected ? 2 : 1,
+                    },
+                  ]}
+                  activeOpacity={0.8}
+                  onPress={() => toggleSelect(item.id)}
+                >
+                  <Image
+                    source={{ uri: item.uri }}
+                    style={styles.thumbnailImg}
+                    contentFit="cover"
+                  />
+
+                  {/* Selection Checkbox Badge */}
                   <View
                     style={[
-                      styles.thumbnailWrapper,
-                      styles.moreThumbnail,
-                      {
-                        backgroundColor: isDark
-                          ? 'rgba(255, 255, 255, 0.06)'
-                          : 'rgba(0, 0, 0, 0.05)',
-                        borderColor: isDark
-                          ? 'rgba(255, 255, 255, 0.12)'
-                          : colors.border,
-                      },
+                      styles.checkCircle,
+                      isSelected
+                        ? { backgroundColor: colors.primary, borderColor: colors.primary }
+                        : {
+                            backgroundColor: 'rgba(0, 0, 0, 0.55)',
+                            borderColor: 'rgba(255, 255, 255, 0.4)',
+                          },
                     ]}
                   >
-                    <Text
-                      style={[
-                        styles.moreCountText,
-                        { color: colors.textPrimary },
-                      ]}
-                    >
-                      +{remainingCount}
-                    </Text>
-                    <Text
-                      style={[
-                        styles.moreSubText,
-                        { color: colors.textSecondary },
-                      ]}
-                    >
-                      more
+                    {isSelected && <Check size={12} color="#FFFFFF" strokeWidth={3} />}
+                  </View>
+
+                  {/* Date Badge */}
+                  <View style={styles.thumbnailDateBadge}>
+                    <Text style={styles.thumbnailDateText}>
+                      {formatRelativeDate(item.creationTime)}
                     </Text>
                   </View>
-                )}
-              </View>
-            </View>
-          )}
+                </TouchableOpacity>
+              );
+            })}
+          </ScrollView>
 
-          {/* Action Choice Buttons */}
+          {/* "Don't Remind Me Again" Checkbox */}
+          <TouchableOpacity
+            style={styles.checkboxRow}
+            activeOpacity={0.7}
+            onPress={() => setDontRemindAgain((prev) => !prev)}
+          >
+            <View
+              style={[
+                styles.checkboxBox,
+                dontRemindAgain
+                  ? { backgroundColor: colors.primary, borderColor: colors.primary }
+                  : {
+                      backgroundColor: isDark
+                        ? 'rgba(255, 255, 255, 0.06)'
+                        : 'rgba(0, 0, 0, 0.04)',
+                      borderColor: isDark
+                        ? 'rgba(255, 255, 255, 0.25)'
+                        : colors.border,
+                    },
+              ]}
+            >
+              {dontRemindAgain && <Check size={12} color="#FFFFFF" strokeWidth={3} />}
+            </View>
+            <View style={styles.checkboxLabelCol}>
+              <Text style={[styles.checkboxLabel, { color: colors.textPrimary }]}>
+                Don&apos;t remind me again
+              </Text>
+              <Text style={[styles.checkboxHint, { color: colors.textMuted }]}>
+                You can turn this back on in Settings anytime
+              </Text>
+            </View>
+          </TouchableOpacity>
+
+          {/* Action Buttons */}
           <View style={styles.actionsContainer}>
-            {/* Auto-Analyze Option */}
             <TouchableOpacity
-              style={styles.primaryActionBtn}
-              onPress={onAutoAnalyzeAll}
+              style={[
+                styles.primaryActionBtn,
+                selectedCount === 0 && { opacity: 0.45 },
+              ]}
+              onPress={handleAnalyze}
+              disabled={selectedCount === 0}
               activeOpacity={0.88}
             >
               <LinearGradient
@@ -176,67 +285,23 @@ export const PastScreenshotsPromptModal: React.FC<PastScreenshotsPromptModalProp
                 </View>
                 <View style={styles.actionTextCol}>
                   <Text style={styles.primaryActionTitle}>
-                    Auto-Analyze All ({count})
+                    {selectedCount === count
+                      ? `Analyze All (${count})`
+                      : `Analyze Selected (${selectedCount})`}
                   </Text>
                   <Text style={styles.primaryActionSubtitle}>
-                    Generate summaries automatically in background
+                    {selectedCount === 0
+                      ? 'Select at least 1 screenshot'
+                      : `Process ${selectedCount} screenshot${selectedCount === 1 ? '' : 's'} with AI`}
                   </Text>
                 </View>
               </LinearGradient>
             </TouchableOpacity>
 
-            {/* Manual Selection Option */}
-            <TouchableOpacity
-              style={[
-                styles.secondaryActionBtn,
-                {
-                  backgroundColor: isDark
-                    ? 'rgba(255, 255, 255, 0.05)'
-                    : colors.surfaceSubtle,
-                  borderColor: isDark
-                    ? 'rgba(255, 255, 255, 0.12)'
-                    : colors.border,
-                },
-              ]}
-              onPress={onSelectManually}
-              activeOpacity={0.82}
-            >
-              <View
-                style={[
-                  styles.actionIconBox,
-                  {
-                    backgroundColor: isDark
-                      ? 'rgba(255, 255, 255, 0.08)'
-                      : 'rgba(0, 0, 0, 0.06)',
-                  },
-                ]}
-              >
-                <SlidersHorizontal size={18} color={colors.textPrimary} />
-              </View>
-              <View style={styles.actionTextCol}>
-                <Text
-                  style={[
-                    styles.secondaryActionTitle,
-                    { color: colors.textPrimary },
-                  ]}
-                >
-                  Select Manually
-                </Text>
-                <Text
-                  style={[
-                    styles.secondaryActionSubtitle,
-                    { color: colors.textSecondary },
-                  ]}
-                >
-                  Review and choose specific screenshots to analyze
-                </Text>
-              </View>
-            </TouchableOpacity>
-
             {/* Dismiss Option */}
             <TouchableOpacity
               style={styles.dismissBtn}
-              onPress={onDismiss}
+              onPress={handleDismiss}
               activeOpacity={0.7}
             >
               <Text style={[styles.dismissText, { color: colors.textMuted }]}>
@@ -253,14 +318,14 @@ export const PastScreenshotsPromptModal: React.FC<PastScreenshotsPromptModalProp
 const styles = StyleSheet.create({
   backdrop: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.72)',
+    backgroundColor: 'rgba(0, 0, 0, 0.76)',
     justifyContent: 'center',
     alignItems: 'center',
-    paddingHorizontal: 20,
+    paddingHorizontal: 18,
   },
   modalContainer: {
     width: '100%',
-    maxWidth: 400,
+    maxWidth: 420,
     borderRadius: 24,
     padding: 22,
     borderWidth: 1,
@@ -274,7 +339,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 14,
+    marginBottom: 10,
   },
   headerLeft: {
     flexDirection: 'row',
@@ -307,30 +372,59 @@ const styles = StyleSheet.create({
   },
   description: {
     fontSize: 13,
-    lineHeight: 19,
-    marginBottom: 16,
+    lineHeight: 18,
+    marginBottom: 12,
   },
-  previewContainer: {
-    marginBottom: 18,
-  },
-  previewRow: {
+  selectionBar: {
     flexDirection: 'row',
-    gap: 8,
     alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 10,
   },
-  thumbnailWrapper: {
-    width: 68,
-    height: 90,
+  selectionCountText: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  selectAllBtn: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 8,
+    borderWidth: 1,
+  },
+  selectAllText: {
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  thumbnailsScroll: {
+    marginBottom: 14,
+  },
+  thumbnailsScrollContent: {
+    gap: 10,
+    paddingVertical: 4,
+    paddingHorizontal: 2,
+  },
+  thumbnailCard: {
+    width: 82,
+    height: 112,
     borderRadius: 12,
     overflow: 'hidden',
     backgroundColor: 'rgba(255, 255, 255, 0.05)',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.1)',
     position: 'relative',
   },
-  thumbnail: {
+  thumbnailImg: {
     width: '100%',
     height: '100%',
+  },
+  checkCircle: {
+    position: 'absolute',
+    top: 6,
+    right: 6,
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    borderWidth: 1.5,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   thumbnailDateBadge: {
     position: 'absolute',
@@ -347,21 +441,34 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     letterSpacing: 0.2,
   },
-  moreThumbnail: {
+  checkboxRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingVertical: 8,
+    marginBottom: 12,
+  },
+  checkboxBox: {
+    width: 20,
+    height: 20,
+    borderRadius: 6,
+    borderWidth: 1.5,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  moreCountText: {
-    fontSize: 16,
-    fontWeight: '800',
+  checkboxLabelCol: {
+    flex: 1,
   },
-  moreSubText: {
-    fontSize: 10,
+  checkboxLabel: {
+    fontSize: 13,
     fontWeight: '600',
+  },
+  checkboxHint: {
+    fontSize: 11,
     marginTop: 1,
   },
   actionsContainer: {
-    gap: 10,
+    gap: 8,
   },
   primaryActionBtn: {
     borderRadius: 16,
@@ -370,17 +477,8 @@ const styles = StyleSheet.create({
   primaryGradient: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 14,
+    paddingVertical: 13,
     paddingHorizontal: 16,
-    gap: 12,
-  },
-  secondaryActionBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 14,
-    paddingHorizontal: 16,
-    borderRadius: 16,
-    borderWidth: 1,
     gap: 12,
   },
   actionIconBox: {
@@ -404,19 +502,10 @@ const styles = StyleSheet.create({
     fontSize: 11,
     marginTop: 2,
   },
-  secondaryActionTitle: {
-    fontSize: 14,
-    fontWeight: '700',
-  },
-  secondaryActionSubtitle: {
-    fontSize: 11,
-    marginTop: 2,
-  },
   dismissBtn: {
-    paddingVertical: 10,
+    paddingVertical: 8,
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: 2,
   },
   dismissText: {
     fontSize: 13,

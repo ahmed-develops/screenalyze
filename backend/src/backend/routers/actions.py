@@ -15,7 +15,7 @@ router = APIRouter(prefix="/api/v1/actions", tags=["Actions & Tutorials"])
 async def execute_action(req: ExecuteActionRequest) -> ExecuteActionResponse:
     """
     Generates step-by-step masterclasses, architectural breakdowns, system design ASCII topologies,
-    or direct follow-up answers using GPT-4o.
+    or direct follow-up answers using Sol.
     """
     if not req.action_or_question and not req.custom_prompt:
         raise HTTPException(

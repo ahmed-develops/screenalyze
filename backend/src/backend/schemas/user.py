@@ -42,6 +42,7 @@ class AppSettings(BaseModel):
     preferred_detail_level: Literal["concise", "detailed", "comprehensive"] = "detailed"
     custom_prompt_instruction: str = ""
     theme_mode: Literal["system", "dark", "light"] = "system"
+    prompt_past_screenshots_enabled: bool = True
 
 class AppSettingsUpdate(BaseModel):
     auto_analyze_screenshots: Optional[bool] = None
@@ -53,3 +54,5 @@ class AppSettingsUpdate(BaseModel):
     preferred_detail_level: Optional[Literal["concise", "detailed", "comprehensive"]] = None
     custom_prompt_instruction: Optional[str] = None
     theme_mode: Optional[Literal["system", "dark", "light"]] = None
+    prompt_past_screenshots_enabled: Optional[bool] = None
+

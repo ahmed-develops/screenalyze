@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useMemo, useEffect } from 'react';
 import {
   Modal,
   View,
@@ -8,9 +8,12 @@ import {
   FlatList,
   ActivityIndicator,
   Dimensions,
+  Animated,
+  Easing,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Image } from 'expo-image';
+import { LinearGradient } from 'expo-linear-gradient';
 import {
   X,
   ShieldCheck,
@@ -18,6 +21,8 @@ import {
   CheckCircle2,
   Image as ImageIcon,
   Lock,
+  Check,
+  Sparkles,
 } from 'lucide-react-native';
 import { MediaService, RetrievedPhoto } from '../services/mediaService';
 import { useTheme } from '../theme/ThemeContext';
@@ -26,6 +31,7 @@ export interface ScreenshotPickerModalProps {
   visible: boolean;
   onClose: () => void;
   onSelectScreenshot: (photo: RetrievedPhoto) => void | Promise<void>;
+  onSelectMultipleScreenshots?: (photos: RetrievedPhoto[]) => void | Promise<void>;
   analyzedIds?: Set<string>;
 }
 
@@ -55,6 +61,7 @@ export const ScreenshotPickerModal: React.FC<ScreenshotPickerModalProps> = ({
   visible,
   onClose,
   onSelectScreenshot,
+  onSelectMultipleScreenshots,
   analyzedIds,
 }) => {
   const { colors, isDark } = useTheme();
@@ -64,7 +71,41 @@ export const ScreenshotPickerModal: React.FC<ScreenshotPickerModalProps> = ({
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [isRefreshing, setIsRefreshing] = useState<boolean>(false);
   const [hasPermission, setHasPermission] = useState<boolean | null>(null);
-  const [selectedPhotoId, setSelectedPhotoId] = useState<string | null>(null);
+
+  // Multi-selection state
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set());
+  const [isResolving, setIsResolving] = useState<boolean>(false);
+
+  const [spinAnim] = useState(() => new Animated.Value(0));
+
+  useEffect(() => {
+    if (isRefreshing) {
+      spinAnim.setValue(0);
+      const loop = Animated.loop(
+        Animated.timing(spinAnim, {
+          toValue: 1,
+          duration: 850,
+          easing: Easing.linear,
+          useNativeDriver: true,
+        })
+      );
+      loop.start();
+      return () => {
+        loop.stop();
+      };
+    } else {
+      spinAnim.setValue(0);
+    }
+  }, [isRefreshing, spinAnim]);
+
+  const spin = useMemo(
+    () =>
+      spinAnim.interpolate({
+        inputRange: [0, 1],
+        outputRange: ['0deg', '360deg'],
+      }),
+    [spinAnim]
+  );
 
   const loadScreenshots = useCallback(async () => {
     try {
@@ -96,30 +137,73 @@ export const ScreenshotPickerModal: React.FC<ScreenshotPickerModalProps> = ({
   }, [loadScreenshots]);
 
   const handleClose = useCallback(() => {
-    setSelectedPhotoId(null);
+    setSelectedIds(new Set());
+    setIsResolving(false);
     onClose();
   }, [onClose]);
 
-  const handleSelect = useCallback(
-    async (photo: RetrievedPhoto) => {
-      try {
-        setSelectedPhotoId(photo.id);
-        const resolved = await MediaService.resolveAssetLocalUri(photo);
-        handleClose();
-        await onSelectScreenshot(resolved);
-      } catch (err) {
-        console.error('Error selecting screenshot', err);
-        handleClose();
-      } finally {
-        setSelectedPhotoId(null);
+  const toggleSelect = useCallback((item: RetrievedPhoto) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(item.id)) {
+        next.delete(item.id);
+      } else {
+        next.add(item.id);
       }
-    },
-    [onSelectScreenshot, handleClose]
-  );
+      return next;
+    });
+  }, []);
+
+  const isAllSelected = selectedIds.size === screenshots.length && screenshots.length > 0;
+
+  const toggleSelectAll = useCallback(() => {
+    if (isAllSelected) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(screenshots.map((s) => s.id)));
+    }
+  }, [isAllSelected, screenshots]);
+
+  const handleConfirmSelection = useCallback(async () => {
+    if (selectedIds.size === 0 || isResolving) return;
+    setIsResolving(true);
+
+    try {
+      const selectedList = screenshots.filter((s) => selectedIds.has(s.id));
+      const resolvedPhotos: RetrievedPhoto[] = [];
+
+      for (const photo of selectedList) {
+        const resolved = await MediaService.resolveAssetLocalUri(photo);
+        resolvedPhotos.push(resolved);
+      }
+
+      handleClose();
+
+      if (resolvedPhotos.length === 1) {
+        await onSelectScreenshot(resolvedPhotos[0]);
+      } else if (onSelectMultipleScreenshots) {
+        await onSelectMultipleScreenshots(resolvedPhotos);
+      } else {
+        await onSelectScreenshot(resolvedPhotos[0]);
+      }
+    } catch (err) {
+      console.error('Error confirming screenshot selection', err);
+      handleClose();
+    } finally {
+      setIsResolving(false);
+    }
+  }, [
+    selectedIds,
+    isResolving,
+    screenshots,
+    handleClose,
+    onSelectScreenshot,
+    onSelectMultipleScreenshots,
+  ]);
 
   const renderItem = ({ item }: { item: RetrievedPhoto }) => {
     const isAnalyzed = analyzedIds ? analyzedIds.has(item.id) : false;
-    const isSelecting = selectedPhotoId === item.id;
+    const isSelected = selectedIds.has(item.id);
 
     return (
       <TouchableOpacity
@@ -127,12 +211,16 @@ export const ScreenshotPickerModal: React.FC<ScreenshotPickerModalProps> = ({
           styles.thumbnailCard,
           {
             backgroundColor: isDark ? 'rgba(255, 255, 255, 0.05)' : colors.surfaceSubtle,
-            borderColor: isDark ? 'rgba(255, 255, 255, 0.1)' : colors.border,
+            borderColor: isSelected
+              ? colors.primary
+              : isDark
+              ? 'rgba(255, 255, 255, 0.1)'
+              : colors.border,
+            borderWidth: isSelected ? 2.5 : 1,
           },
         ]}
         activeOpacity={0.8}
-        onPress={() => handleSelect(item)}
-        disabled={selectedPhotoId !== null}
+        onPress={() => toggleSelect(item)}
       >
         <Image
           source={{ uri: item.uri }}
@@ -141,6 +229,21 @@ export const ScreenshotPickerModal: React.FC<ScreenshotPickerModalProps> = ({
           transition={150}
           cachePolicy="memory-disk"
         />
+
+        {/* Selection Checkbox Badge */}
+        <View
+          style={[
+            styles.checkBadge,
+            isSelected
+              ? { backgroundColor: colors.primary, borderColor: colors.primary }
+              : {
+                  backgroundColor: 'rgba(0, 0, 0, 0.55)',
+                  borderColor: 'rgba(255, 255, 255, 0.45)',
+                },
+          ]}
+        >
+          {isSelected && <Check size={12} color="#FFFFFF" strokeWidth={3} />}
+        </View>
 
         {/* Bottom subtle gradient scrim for timestamp */}
         <View style={styles.thumbnailScrim}>
@@ -152,15 +255,8 @@ export const ScreenshotPickerModal: React.FC<ScreenshotPickerModalProps> = ({
         {/* Analyzed indicator badge */}
         {isAnalyzed && (
           <View style={styles.analyzedBadge}>
-            <CheckCircle2 size={11} color="#10B981" />
+            <CheckCircle2 size={10} color="#10B981" />
             <Text style={styles.analyzedBadgeText}>Analyzed</Text>
-          </View>
-        )}
-
-        {/* Selection spinner */}
-        {isSelecting && (
-          <View style={styles.selectingOverlay}>
-            <ActivityIndicator size="small" color="#0099ff" />
           </View>
         )}
       </TouchableOpacity>
@@ -183,7 +279,7 @@ export const ScreenshotPickerModal: React.FC<ScreenshotPickerModalProps> = ({
             {
               backgroundColor: isDark ? '#11151e' : colors.card,
               borderColor: isDark ? 'rgba(255, 255, 255, 0.12)' : colors.border,
-              paddingBottom: Math.max(insets.bottom, 16),
+              paddingBottom: Math.max(insets.bottom, 12),
             },
           ]}
         >
@@ -205,10 +301,10 @@ export const ScreenshotPickerModal: React.FC<ScreenshotPickerModalProps> = ({
               </View>
               <View>
                 <Text style={[styles.headerTitle, { color: colors.textPrimary }]}>
-                  Pick A Screenshot
+                  Pick Screenshots
                 </Text>
                 <Text style={[styles.headerSubtitle, { color: colors.textSecondary }]}>
-                  Device Screenshots Album Only
+                  Tap to select multiple screenshots
                 </Text>
               </View>
             </View>
@@ -226,11 +322,12 @@ export const ScreenshotPickerModal: React.FC<ScreenshotPickerModalProps> = ({
                 activeOpacity={0.7}
                 disabled={isRefreshing || isLoading}
               >
-                <RefreshCw
-                  size={16}
-                  color={colors.textPrimary}
-                  style={isRefreshing ? styles.spinning : undefined}
-                />
+                <Animated.View style={{ transform: [{ rotate: spin }] }}>
+                  <RefreshCw
+                    size={16}
+                    color={colors.textPrimary}
+                  />
+                </Animated.View>
               </TouchableOpacity>
 
               <TouchableOpacity
@@ -264,17 +361,44 @@ export const ScreenshotPickerModal: React.FC<ScreenshotPickerModalProps> = ({
               <Text style={styles.privacyBannerTitle}>Gallery Privacy Protected</Text>
             </View>
             <Text style={[styles.privacyBannerDesc, { color: colors.textSecondary }]}>
-              Access is strictly restricted to your Screenshots album. Personal camera roll photos, selfies, and videos are never exposed or loaded.
+              Access is strictly restricted to your Screenshots album. Personal camera roll photos and videos are never exposed.
             </Text>
           </View>
 
-          {/* Subheader / Counter */}
+          {/* Subheader / Counter & Selection Bar */}
           <View style={styles.counterRow}>
             <Text style={[styles.counterText, { color: colors.textSecondary }]}>
               {isLoading
                 ? 'Scanning Screenshots album...'
                 : `${screenshots.length} screenshot${screenshots.length === 1 ? '' : 's'} found`}
             </Text>
+
+            {!isLoading && screenshots.length > 0 && (
+              <View style={styles.counterRightActions}>
+                {selectedIds.size > 0 && (
+                  <View style={styles.selectedPillBadge}>
+                    <Text style={[styles.selectedPillBadgeText, { color: colors.primary }]}>
+                      {selectedIds.size} selected
+                    </Text>
+                  </View>
+                )}
+                <TouchableOpacity
+                  style={[
+                    styles.selectAllPill,
+                    {
+                      backgroundColor: isDark ? 'rgba(255, 255, 255, 0.08)' : colors.surfaceSubtle,
+                      borderColor: isDark ? 'rgba(255, 255, 255, 0.15)' : colors.border,
+                    },
+                  ]}
+                  onPress={toggleSelectAll}
+                  activeOpacity={0.7}
+                >
+                  <Text style={[styles.selectAllPillText, { color: colors.primary }]}>
+                    {isAllSelected ? 'Deselect All' : 'Select All'}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            )}
           </View>
 
           {/* Main Content */}
@@ -331,12 +455,62 @@ export const ScreenshotPickerModal: React.FC<ScreenshotPickerModalProps> = ({
               renderItem={renderItem}
               numColumns={3}
               columnWrapperStyle={styles.columnWrapper}
-              contentContainerStyle={styles.listContent}
+              contentContainerStyle={[
+                styles.listContent,
+                selectedIds.size > 0 && { paddingBottom: 90 },
+              ]}
               showsVerticalScrollIndicator={false}
               initialNumToRender={15}
               maxToRenderPerBatch={15}
               windowSize={5}
             />
+          )}
+
+          {/* Bottom Floating Action Bar when screenshots are selected */}
+          {selectedIds.size > 0 && (
+            <View
+              style={[
+                styles.floatingActionBar,
+                {
+                  backgroundColor: isDark ? 'rgba(17, 21, 30, 0.96)' : colors.card,
+                  borderColor: isDark ? 'rgba(255, 255, 255, 0.15)' : colors.border,
+                },
+              ]}
+            >
+              <View style={styles.floatingActionTextCol}>
+                <Text style={[styles.floatingActionTitle, { color: colors.textPrimary }]}>
+                  {selectedIds.size} Screenshot{selectedIds.size === 1 ? '' : 's'} Selected
+                </Text>
+                <Text style={[styles.floatingActionSub, { color: colors.textMuted }]}>
+                  Tap to process with AI analysis
+                </Text>
+              </View>
+
+              <TouchableOpacity
+                style={styles.floatingSubmitBtn}
+                onPress={handleConfirmSelection}
+                disabled={isResolving}
+                activeOpacity={0.85}
+              >
+                <LinearGradient
+                  colors={['#6366F1', '#4F46E5']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={styles.floatingSubmitGradient}
+                >
+                  {isResolving ? (
+                    <ActivityIndicator size="small" color="#FFFFFF" />
+                  ) : (
+                    <>
+                      <Sparkles size={16} color="#FFFFFF" />
+                      <Text style={styles.floatingSubmitText}>
+                        {selectedIds.size === 1 ? 'Analyze' : `Analyze (${selectedIds.size})`}
+                      </Text>
+                    </>
+                  )}
+                </LinearGradient>
+              </TouchableOpacity>
+            </View>
           )}
         </SafeAreaView>
       </View>
@@ -351,7 +525,7 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   modalContainer: {
-    maxHeight: '90%',
+    maxHeight: '92%',
     minHeight: '65%',
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
@@ -410,15 +584,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  spinning: {
-    transform: [{ rotate: '45deg' }],
-  },
+
   privacyBanner: {
     marginHorizontal: HORIZONTAL_PADDING,
     marginTop: 4,
-    marginBottom: 10,
+    marginBottom: 8,
     paddingHorizontal: 12,
-    paddingVertical: 9,
+    paddingVertical: 8,
     borderRadius: 12,
     borderWidth: 1,
   },
@@ -426,7 +598,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    marginBottom: 3,
+    marginBottom: 2,
   },
   privacyBannerTitle: {
     fontSize: 12,
@@ -441,10 +613,38 @@ const styles = StyleSheet.create({
   counterRow: {
     paddingHorizontal: HORIZONTAL_PADDING,
     paddingBottom: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
   },
   counterText: {
     fontSize: 12,
     fontWeight: '600',
+  },
+  counterRightActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  selectedPillBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+    backgroundColor: 'rgba(99, 102, 241, 0.15)',
+  },
+  selectedPillBadgeText: {
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  selectAllPill: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 8,
+    borderWidth: 1,
+  },
+  selectAllPillText: {
+    fontSize: 11,
+    fontWeight: '700',
   },
   listContent: {
     paddingHorizontal: HORIZONTAL_PADDING,
@@ -459,12 +659,23 @@ const styles = StyleSheet.create({
     height: ITEM_HEIGHT,
     borderRadius: 12,
     overflow: 'hidden',
-    borderWidth: 1,
     position: 'relative',
   },
   thumbnailImage: {
     width: '100%',
     height: '100%',
+  },
+  checkBadge: {
+    position: 'absolute',
+    top: 6,
+    right: 6,
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    borderWidth: 1.5,
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 5,
   },
   thumbnailScrim: {
     position: 'absolute',
@@ -483,30 +694,67 @@ const styles = StyleSheet.create({
   },
   analyzedBadge: {
     position: 'absolute',
-    top: 5,
-    right: 5,
+    top: 6,
+    left: 6,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 3,
-    backgroundColor: 'rgba(16, 185, 129, 0.9)',
-    paddingHorizontal: 6,
-    paddingVertical: 2.5,
-    borderRadius: 6,
+    backgroundColor: 'rgba(16, 185, 129, 0.92)',
+    paddingHorizontal: 5,
+    paddingVertical: 2,
+    borderRadius: 5,
+    zIndex: 4,
   },
   analyzedBadgeText: {
     color: '#ffffff',
-    fontSize: 9,
+    fontSize: 8,
     fontWeight: '700',
   },
-  selectingOverlay: {
+  floatingActionBar: {
     position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    bottom: 16,
+    left: HORIZONTAL_PADDING,
+    right: HORIZONTAL_PADDING,
+    borderRadius: 16,
+    borderWidth: 1,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
+    justifyContent: 'space-between',
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.35,
+    shadowRadius: 16,
+    elevation: 10,
+  },
+  floatingActionTextCol: {
+    flex: 1,
+    marginRight: 12,
+  },
+  floatingActionTitle: {
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  floatingActionSub: {
+    fontSize: 11,
+    marginTop: 1,
+  },
+  floatingSubmitBtn: {
+    borderRadius: 12,
+    overflow: 'hidden',
+  },
+  floatingSubmitGradient: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+  },
+  floatingSubmitText: {
+    color: '#FFFFFF',
+    fontSize: 13,
+    fontWeight: '700',
   },
   centerContainer: {
     flex: 1,

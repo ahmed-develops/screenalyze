@@ -127,7 +127,9 @@ export interface AppSettings {
   preferredDetailLevel: 'concise' | 'detailed' | 'comprehensive';
   customPromptInstruction: string;
   themeMode?: ThemeMode;
+  promptPastScreenshotsEnabled?: boolean;
 }
+
 
 export interface UserProfile {
   name: string;
@@ -146,4 +148,24 @@ export interface UserProfile {
   telemetryEnabled: boolean;
   isRegistered?: boolean;
 }
+
+export interface BatchAnalysisItemResult {
+  id: string;
+  uri: string;
+  timestamp?: number;
+  status: 'analyzed' | 'skipped' | 'already_analyzed' | 'failed';
+  title?: string;
+  category?: string;
+  reason?: string;
+  analysis?: ScreenshotAnalysis;
+}
+
+export interface BatchAnalysisSummary {
+  total: number;
+  analyzedCount: number;
+  skippedCount: number;
+  items: BatchAnalysisItemResult[];
+  completedAt: number;
+}
+
 

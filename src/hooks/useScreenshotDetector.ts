@@ -2,7 +2,13 @@ import { useEffect, useRef, useState, useCallback } from 'react';
 import { AppState, AppStateStatus } from 'react-native';
 import * as ScreenCapture from 'expo-screen-capture';
 import * as LegacyMediaLibrary from 'expo-media-library/legacy';
-import { ScreenshotAnalysis, isAppropriateScreenshot, isAppropriateCategory } from '../types';
+import {
+  ScreenshotAnalysis,
+  isAppropriateScreenshot,
+  isAppropriateCategory,
+  BatchAnalysisSummary,
+  BatchAnalysisItemResult,
+} from '../types';
 import { MediaService, RetrievedPhoto } from '../services/mediaService';
 import { AIService } from '../services/aiService';
 import { ApiClient } from '../services/apiClient';
@@ -23,11 +29,20 @@ export interface PendingScreenshot {
   currentIndex?: number;
 }
 
+export interface ProcessDetailResult {
+  status: 'analyzed' | 'skipped' | 'already_analyzed' | 'failed';
+  analysis?: ScreenshotAnalysis;
+  title?: string;
+  category?: string;
+  reason?: string;
+}
+
 export function useScreenshotDetector(options?: {
   onScreenshotDetected?: (pending: PendingScreenshot) => void;
   onScreenshotAnalyzed?: (item: ScreenshotAnalysis, isManualPick?: boolean) => void;
   onAnalysisError?: (error: FormattedAnalysisError, isManualPick?: boolean) => void;
   onPastScreenshotsPending?: (pastScreenshots: RetrievedPhoto[]) => void;
+  onBatchAnalysisCompleted?: (summary: BatchAnalysisSummary) => void;
 }) {
   const [isListening, setIsListening] = useState(true);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
@@ -38,6 +53,7 @@ export function useScreenshotDetector(options?: {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [bannerError, setBannerError] = useState<FormattedAnalysisError | null>(null);
   const [pendingPastScreenshots, setPendingPastScreenshots] = useState<RetrievedPhoto[]>([]);
+  const [lastBatchSummary, setLastBatchSummary] = useState<BatchAnalysisSummary | null>(null);
 
   // Store options in a ref to avoid recreating callbacks on every parent re-render
   const optionsRef = useRef(options);
@@ -109,7 +125,7 @@ export function useScreenshotDetector(options?: {
       externalId?: string,
       preloadedBase64?: string,
       processOptions?: { isManualPick?: boolean; silentNotification?: boolean; isBatch?: boolean }
-    ): Promise<ScreenshotAnalysis | null> => {
+    ): Promise<ProcessDetailResult> => {
       setErrorMessage(null);
       setBannerError(null);
       setAnalysisStatus('Reading screenshot pixels...');
@@ -132,7 +148,13 @@ export function useScreenshotDetector(options?: {
                 optionsRef.current.onScreenshotAnalyzed(existingById, Boolean(processOptions?.isManualPick));
               }
             }
-            return existingById;
+            return {
+              status: 'already_analyzed',
+              analysis: existingById,
+              title: existingById.title,
+              category: existingById.category,
+              reason: 'Already analyzed and saved in your library.',
+            };
           }
         }
 
@@ -158,7 +180,13 @@ export function useScreenshotDetector(options?: {
                 optionsRef.current.onScreenshotAnalyzed(existingByHash, Boolean(processOptions?.isManualPick));
               }
             }
-            return existingByHash;
+            return {
+              status: 'already_analyzed',
+              analysis: existingByHash,
+              title: existingByHash.title,
+              category: existingByHash.category,
+              reason: 'Matches an existing screenshot in your library.',
+            };
           }
 
           const isIgnored = await StorageService.isAlreadyAnalyzed({
@@ -182,7 +210,11 @@ export function useScreenshotDetector(options?: {
                 optionsRef.current.onAnalysisError(errorInfo, true);
               }
             }
-            return null;
+            return {
+              status: 'skipped',
+              category: 'personal-or-non-actionable',
+              reason: 'Previously filtered out as personal/non-actionable content.',
+            };
           }
         }
 
@@ -220,7 +252,11 @@ export function useScreenshotDetector(options?: {
             if (optionsRef.current?.onAnalysisError) {
               optionsRef.current.onAnalysisError(errorInfo, Boolean(processOptions?.isManualPick));
             }
-            return null;
+            return {
+              status: 'skipped',
+              category: categorization.category,
+              reason: categorization.reason || `Categorized as ${categorization.category} (non-actionable/personal photo).`,
+            };
           }
         }
 
@@ -293,7 +329,12 @@ export function useScreenshotDetector(options?: {
           if (optionsRef.current?.onAnalysisError) {
             optionsRef.current.onAnalysisError(errorInfo, Boolean(processOptions?.isManualPick));
           }
-          return null;
+          return {
+            status: 'skipped',
+            category: newAnalysisItem.category,
+            title: newAnalysisItem.title,
+            reason: errorInfo.message || `Non-actionable ${newAnalysisItem.category} content filtered out.`,
+          };
         }
 
         // Successful analysis - reset any prior offline state
@@ -322,7 +363,13 @@ export function useScreenshotDetector(options?: {
           optionsRef.current.onScreenshotAnalyzed(newAnalysisItem, Boolean(processOptions?.isManualPick));
         }
 
-        return newAnalysisItem;
+        return {
+          status: 'analyzed',
+          analysis: newAnalysisItem,
+          title: newAnalysisItem.title,
+          category: newAnalysisItem.category,
+          reason: 'Successfully analyzed by Sol vision engine.',
+        };
       } catch (err: unknown) {
         const errorInfo = getFriendlyAnalysisError(err);
         console.error('Error analyzing screenshot:', err);
@@ -345,7 +392,10 @@ export function useScreenshotDetector(options?: {
           optionsRef.current.onAnalysisError(errorInfo, Boolean(processOptions?.isManualPick));
         }
 
-        return null;
+        return {
+          status: 'failed',
+          reason: errorInfo.message || 'Analysis failed due to network or processing error.',
+        };
       }
     },
     []
@@ -366,12 +416,13 @@ export function useScreenshotDetector(options?: {
       setIsAnalyzing(true);
 
       try {
-        return await processScreenshotInternal(
+        const detail = await processScreenshotInternal(
           imageUri,
           externalId,
           preloadedBase64,
           processOptions
         );
+        return detail.analysis || null;
       } finally {
         if (!processOptions?.isBatch) {
           isAnalyzingRef.current = false;
@@ -421,11 +472,19 @@ export function useScreenshotDetector(options?: {
 
         let analyzedCount = 0;
         let lastAnalyzedItem: ScreenshotAnalysis | null = null;
+        const itemResults: BatchAnalysisItemResult[] = [];
 
         for (let i = 0; i < candidates.length; i++) {
           if (isServerOfflineRef.current) {
             for (let j = i; j < candidates.length; j++) {
               failedAssetIdsRef.current.add(candidates[j].id);
+              itemResults.push({
+                id: candidates[j].id,
+                uri: candidates[j].uri,
+                timestamp: candidates[j].creationTime,
+                status: 'failed',
+                reason: 'Screenalyze backend server is offline or unreachable.',
+              });
             }
             break;
           }
@@ -453,16 +512,41 @@ export function useScreenshotDetector(options?: {
             optionsRef.current.onScreenshotDetected(pending);
           }
 
-          const result = await processScreenshotInternal(candidate.uri, candidate.id, undefined, {
+          const detail = await processScreenshotInternal(candidate.uri, candidate.id, undefined, {
             isManualPick: false,
             silentNotification: true,
             isBatch: true,
           });
 
-          if (result && isAppropriateScreenshot(result)) {
+          const itemResult: BatchAnalysisItemResult = {
+            id: candidate.id,
+            uri: candidate.uri,
+            timestamp: candidate.creationTime,
+            status: detail.status,
+            title: detail.title || (detail.analysis?.title),
+            category: detail.category || (detail.analysis?.category),
+            reason: detail.reason,
+            analysis: detail.analysis,
+          };
+          itemResults.push(itemResult);
+
+          if ((detail.status === 'analyzed' || detail.status === 'already_analyzed') && detail.analysis && isAppropriateScreenshot(detail.analysis)) {
             analyzedCount++;
-            lastAnalyzedItem = result;
+            lastAnalyzedItem = detail.analysis;
           }
+        }
+
+        const batchSummary: BatchAnalysisSummary = {
+          total: totalCount,
+          analyzedCount,
+          skippedCount: totalCount - analyzedCount,
+          items: itemResults,
+          completedAt: Date.now(),
+        };
+
+        setLastBatchSummary(batchSummary);
+        if (optionsRef.current?.onBatchAnalysisCompleted) {
+          optionsRef.current.onBatchAnalysisCompleted(batchSummary);
         }
 
         if (analyzedCount > 0 && currentSettings.enableNotifications && AppState.currentState !== 'active') {
@@ -549,16 +633,22 @@ export function useScreenshotDetector(options?: {
         }
 
         // 2. ONCE PRESENT-DAY IS COMPLETED, CHECK IF PAST SCREENSHOTS EXIST AND PROMPT USER
-        if (eligiblePastScreenshots.length > 0 && !pastPromptDismissedRef.current) {
+        const settings = await StorageService.getSettings();
+        if (
+          settings.promptPastScreenshotsEnabled !== false &&
+          eligiblePastScreenshots.length > 0 &&
+          !pastPromptDismissedRef.current
+        ) {
           setPendingPastScreenshots(eligiblePastScreenshots);
           if (optionsRef.current?.onPastScreenshotsPending) {
             optionsRef.current.onPastScreenshotsPending(eligiblePastScreenshots);
           }
-        } else if (eligiblePastScreenshots.length === 0) {
+        } else {
           setPendingPastScreenshots([]);
         }
 
         return todaySuccess;
+
       } catch (e) {
         console.warn('Error checking for new screenshots', e);
         isAnalyzingRef.current = false;
@@ -734,5 +824,8 @@ export function useScreenshotDetector(options?: {
       await checkForNewScreenshot(true);
     },
     scanRecentScreenshots,
+    lastBatchSummary,
+    setLastBatchSummary,
+    clearBatchSummary: () => setLastBatchSummary(null),
   };
 }

@@ -125,7 +125,7 @@ export const ApiClient = {
   },
 
   /**
-   * Multimodal GPT-4o analysis via backend (/api/v1/screenshots/analyze)
+   * Multimodal Sol analysis via backend (/api/v1/screenshots/analyze)
    */
   async analyzeScreenshot(
     imageBase64: string,
@@ -372,6 +372,7 @@ export const ApiClient = {
       preferredDetailLevel: data.preferred_detail_level,
       customPromptInstruction: data.custom_prompt_instruction,
       themeMode: data.theme_mode,
+      promptPastScreenshotsEnabled: data.prompt_past_screenshots_enabled,
     };
   },
 
@@ -387,6 +388,7 @@ export const ApiClient = {
     if (updates.preferredDetailLevel !== undefined) body.preferred_detail_level = updates.preferredDetailLevel;
     if (updates.customPromptInstruction !== undefined) body.custom_prompt_instruction = updates.customPromptInstruction;
     if (updates.themeMode !== undefined) body.theme_mode = updates.themeMode;
+    if (updates.promptPastScreenshotsEnabled !== undefined) body.prompt_past_screenshots_enabled = updates.promptPastScreenshotsEnabled;
 
     const res = await fetch(url, {
       method: 'PUT',
@@ -408,8 +410,10 @@ export const ApiClient = {
       preferredDetailLevel: data.preferred_detail_level,
       customPromptInstruction: data.custom_prompt_instruction,
       themeMode: data.theme_mode,
+      promptPastScreenshotsEnabled: data.prompt_past_screenshots_enabled,
     };
   },
+
 
   /**
    * Passwordless Auth endpoints

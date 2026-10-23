@@ -46,7 +46,9 @@ const DEFAULT_SETTINGS: AppSettings = {
   preferredDetailLevel: 'detailed',
   customPromptInstruction: '',
   themeMode: 'system',
+  promptPastScreenshotsEnabled: true,
 };
+
 
 export const INITIAL_STITCH_SCREENSHOTS: ScreenshotAnalysis[] = [
   {
