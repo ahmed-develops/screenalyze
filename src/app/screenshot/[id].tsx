@@ -32,9 +32,13 @@ import {
   Plus,
   BookOpen,
   RefreshCw,
+  ExternalLink,
+  Globe,
+  Zap,
 } from 'lucide-react-native';
 import { StorageService } from '../../services/storageService';
 import { AIService } from '../../services/aiService';
+import { ApiClient } from '../../services/apiClient';
 import { ScreenshotAnalysis, GeneratedArtifact } from '../../types';
 import { Colors } from '../../theme/colors';
 import { getFriendlyAnalysisError } from '../../utils/errorUtils';
@@ -42,6 +46,9 @@ import { FormattedAIResponse } from '../../components/FormattedAIResponse';
 import { ActionPickerModal } from '../../components/ActionPickerModal';
 import * as Sharing from 'expo-sharing';
 import * as Clipboard from 'expo-clipboard';
+import * as Linking from 'expo-linking';
+import { LinearGradient } from 'expo-linear-gradient';
+
 
 interface ChatMessage {
   id: string;
@@ -266,7 +273,15 @@ export default function ScreenshotDetailScreen() {
     );
   }, [screenshot, isReanalyzing]);
 
-  const handleShareOverall = async () => {
+  const [forwardModalVisible, setForwardModalVisible] = useState(false);
+  const [isForwarding, setIsForwarding] = useState(false);
+  const [forwardUrl, setForwardUrl] = useState<string | null>(null);
+
+  const handleShareOverall = () => {
+    setForwardModalVisible(true);
+  };
+
+  const handleNativeShare = async () => {
     if (!screenshot) return;
     const shareText = `📌 ${screenshot.title}\n\n${screenshot.summary}\n\nKey Concepts:\n${screenshot.keyPoints.map((p) => `• ${p}`).join('\n')}\n\nAnalyzed with Screenalyze`;
 
@@ -283,6 +298,49 @@ export default function ScreenshotDetailScreen() {
       await Clipboard.setStringAsync(shareText);
     }
   };
+
+  const handleForwardToWeb = async (openImmediately: boolean = true) => {
+    if (!screenshot || isForwarding) return;
+    setIsForwarding(true);
+
+    try {
+      const base64 = await AIService.getImageBase64(screenshot.imageUri);
+
+      const res = await ApiClient.forwardScreenshotSession({
+        screenshotId: screenshot.id,
+        title: screenshot.title,
+        category: screenshot.category,
+        summary: screenshot.summary,
+        keyPoints: screenshot.keyPoints,
+        contextualActions: screenshot.contextualActions,
+        followUpQuestions: screenshot.followUpQuestions,
+        generatedContent: screenshot.generatedContent,
+        imageBase64: base64,
+        imageUrl: screenshot.imageUri,
+        initialPrompt: screenshot.summary,
+      });
+
+      setForwardUrl(res.dashboardUrl);
+      await Clipboard.setStringAsync(res.dashboardUrl);
+
+      if (openImmediately) {
+        await Linking.openURL(res.dashboardUrl);
+        setForwardModalVisible(false);
+      } else {
+        Alert.alert(
+          'Web Session Copied!',
+          'Live session URL copied to clipboard. You can paste it into your desktop browser.'
+        );
+      }
+    } catch (err: unknown) {
+      console.error('Failed forwarding screenshot to web', err);
+      const friendly = getFriendlyAnalysisError(err);
+      Alert.alert(friendly.title, friendly.message);
+    } finally {
+      setIsForwarding(false);
+    }
+  };
+
 
   const handleCopyText = async (text: string, messageId: string) => {
     await Clipboard.setStringAsync(text);
@@ -535,8 +593,46 @@ export default function ScreenshotDetailScreen() {
                         </View>
                       )}
 
+                      {/* Forward to Web Dashboard & MCP Studio Banner */}
+                      <TouchableOpacity
+                        style={styles.forwardBanner}
+                        activeOpacity={0.85}
+                        onPress={() => handleForwardToWeb(true)}
+                        disabled={isForwarding}
+                      >
+                        <LinearGradient
+                          colors={['rgba(0, 240, 255, 0.14)', 'rgba(139, 92, 246, 0.14)']}
+                          start={{ x: 0, y: 0 }}
+                          end={{ x: 1, y: 0 }}
+                          style={styles.forwardBannerGradient}
+                        >
+                          <View style={styles.forwardBannerLeft}>
+                            <View style={styles.forwardBannerIcon}>
+                              <Globe size={18} color="#00F0FF" />
+                            </View>
+                            <View style={{ flex: 1 }}>
+                              <View style={styles.forwardTitleRow}>
+                                <Text style={styles.forwardBannerTitle}>Forward to Web Dashboard</Text>
+                                <View style={styles.mcpPill}>
+                                  <Text style={styles.mcpPillText}>MCP STUDIO</Text>
+                                </View>
+                              </View>
+                              <Text style={styles.forwardBannerSubtitle}>
+                                Open live session in browser to trigger automated workflows & connect MCP tools
+                              </Text>
+                            </View>
+                          </View>
+                          {isForwarding ? (
+                            <ActivityIndicator size="small" color="#00F0FF" />
+                          ) : (
+                            <ExternalLink size={16} color="#00F0FF" />
+                          )}
+                        </LinearGradient>
+                      </TouchableOpacity>
+
                       {/* Interactive Options Directly in Welcome Message */}
                       <View style={styles.initialQuickActionsSection}>
+
                         <Text style={styles.quickActionsLabel}>QUICK ACTIONS & QUESTIONS:</Text>
                         <View style={styles.quickActionsList}>
                           {contextualActions.map((action, aIdx) => (
@@ -752,7 +848,117 @@ export default function ScreenshotDetailScreen() {
         }}
       />
 
+      {/* Forward to Web Dashboard & MCP Studio Modal */}
+
+      <Modal
+        visible={forwardModalVisible}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => setForwardModalVisible(false)}
+      >
+        <View style={styles.forwardModalOverlay}>
+          <View style={styles.forwardModalContent}>
+            {/* Modal Header */}
+            <View style={styles.forwardModalHeader}>
+              <View style={styles.forwardHeaderLeft}>
+                <View style={styles.forwardIconBadge}>
+                  <Zap size={18} color="#00F0FF" />
+                </View>
+                <View>
+                  <Text style={styles.forwardModalTitle}>Forwarding Workflow</Text>
+                  <Text style={styles.forwardModalSubtitle}>
+                    Web Dashboard & MCP Integrations Hub
+                  </Text>
+                </View>
+              </View>
+              <TouchableOpacity
+                onPress={() => setForwardModalVisible(false)}
+                style={styles.forwardModalClose}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              >
+                <X size={20} color={Colors.textSecondary} />
+              </TouchableOpacity>
+            </View>
+
+            {/* Explanatory Notice */}
+            <View style={styles.forwardNoticeBox}>
+              <Text style={styles.forwardNoticeText}>
+                Forwarding starts this screenshot and its analysis prompt in a connected Web Dashboard session. You can execute prompts, run automated workflows (GitHub PRs, Terraform, Slack digests), and connect MCP servers.
+              </Text>
+            </View>
+
+            {/* Action 1: Launch in Browser */}
+            <TouchableOpacity
+              style={styles.forwardPrimaryAction}
+              activeOpacity={0.85}
+              disabled={isForwarding}
+              onPress={() => handleForwardToWeb(true)}
+            >
+              <LinearGradient
+                colors={['#00F0FF', '#8B5CF6']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                style={styles.forwardPrimaryGradient}
+              >
+                <Globe size={18} color="#000" />
+                <Text style={styles.forwardPrimaryText}>
+                  {isForwarding ? 'Forwarding Session...' : 'Open in Web Browser'}
+                </Text>
+                {isForwarding ? (
+                  <ActivityIndicator size="small" color="#000" />
+                ) : (
+                  <ExternalLink size={16} color="#000" />
+                )}
+              </LinearGradient>
+            </TouchableOpacity>
+
+            {/* Action 2: Copy Live Session Link */}
+            <TouchableOpacity
+              style={styles.forwardSecondaryAction}
+              activeOpacity={0.8}
+              disabled={isForwarding}
+              onPress={() => handleForwardToWeb(false)}
+            >
+              <Copy size={16} color={Colors.accent} />
+              <View style={{ flex: 1, marginLeft: 10 }}>
+                <Text style={styles.forwardSecondaryTitle}>Copy Desktop Web Link</Text>
+                <Text style={styles.forwardSecondarySub}>
+                  Paste URL in your Mac / PC desktop browser
+                </Text>
+              </View>
+            </TouchableOpacity>
+
+            {/* Action 3: Native System Share */}
+            <TouchableOpacity
+              style={styles.forwardSecondaryAction}
+              activeOpacity={0.8}
+              onPress={() => {
+                setForwardModalVisible(false);
+                handleNativeShare();
+              }}
+            >
+              <Share2 size={16} color={Colors.textSecondary} />
+              <View style={{ flex: 1, marginLeft: 10 }}>
+                <Text style={styles.forwardSecondaryTitle}>Standard System Share</Text>
+                <Text style={styles.forwardSecondarySub}>
+                  Send image & summary via AirDrop, Messages, etc.
+                </Text>
+              </View>
+            </TouchableOpacity>
+
+            {forwardUrl && (
+              <View style={styles.forwardUrlPreviewBox}>
+                <Text style={styles.forwardUrlLabel}>ACTIVE SESSION LINK:</Text>
+                <Text style={styles.forwardUrlText} numberOfLines={1}>{forwardUrl}</Text>
+              </View>
+            )}
+          </View>
+        </View>
+      </Modal>
+
+
       {/* Full Image Zoom Modal */}
+
       <Modal
         visible={fullImageVisible}
         transparent={true}
@@ -1388,4 +1594,185 @@ const styles = StyleSheet.create({
     width: '94%',
     height: '84%',
   },
+  forwardBanner: {
+    marginTop: 14,
+    marginBottom: 6,
+    borderRadius: 14,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: 'rgba(0, 240, 255, 0.35)',
+  },
+  forwardBannerGradient: {
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  forwardBannerLeft: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginRight: 10,
+  },
+  forwardBannerIcon: {
+    width: 34,
+    height: 34,
+    borderRadius: 8,
+    backgroundColor: 'rgba(0, 240, 255, 0.15)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+  },
+  forwardTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 2,
+  },
+  forwardBannerTitle: {
+    color: '#ffffff',
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  mcpPill: {
+    backgroundColor: 'rgba(139, 92, 246, 0.25)',
+    paddingHorizontal: 6,
+    paddingVertical: 1,
+    borderRadius: 4,
+    borderWidth: 1,
+    borderColor: 'rgba(139, 92, 246, 0.4)',
+  },
+  mcpPillText: {
+    color: '#C4B5FD',
+    fontSize: 9,
+    fontWeight: '800',
+    letterSpacing: 0.5,
+  },
+  forwardBannerSubtitle: {
+    color: '#94A3B8',
+    fontSize: 11,
+    lineHeight: 15,
+  },
+  forwardModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.8)',
+    justifyContent: 'flex-end',
+  },
+  forwardModalContent: {
+    backgroundColor: '#0E1322',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    borderTopWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.12)',
+    padding: 24,
+    paddingBottom: 38,
+  },
+  forwardModalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 16,
+  },
+  forwardHeaderLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  forwardIconBadge: {
+    width: 38,
+    height: 38,
+    borderRadius: 10,
+    backgroundColor: 'rgba(0, 240, 255, 0.15)',
+    borderWidth: 1,
+    borderColor: 'rgba(0, 240, 255, 0.3)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  forwardModalTitle: {
+    color: '#ffffff',
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  forwardModalSubtitle: {
+    color: '#94A3B8',
+    fontSize: 12,
+    marginTop: 2,
+  },
+  forwardModalClose: {
+    padding: 6,
+  },
+  forwardNoticeBox: {
+    backgroundColor: 'rgba(255, 255, 255, 0.04)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 18,
+  },
+  forwardNoticeText: {
+    color: '#CBD5E1',
+    fontSize: 12,
+    lineHeight: 18,
+  },
+  forwardPrimaryAction: {
+    borderRadius: 12,
+    overflow: 'hidden',
+    marginBottom: 12,
+  },
+  forwardPrimaryGradient: {
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 10,
+  },
+  forwardPrimaryText: {
+    color: '#000000',
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  forwardSecondaryAction: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.04)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 10,
+  },
+  forwardSecondaryTitle: {
+    color: '#ffffff',
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  forwardSecondarySub: {
+    color: '#94A3B8',
+    fontSize: 11,
+    marginTop: 2,
+  },
+  forwardUrlPreviewBox: {
+    backgroundColor: 'rgba(0, 240, 255, 0.08)',
+    borderWidth: 1,
+    borderColor: 'rgba(0, 240, 255, 0.25)',
+    borderRadius: 10,
+    padding: 10,
+    marginTop: 4,
+  },
+  forwardUrlLabel: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#00F0FF',
+    letterSpacing: 0.5,
+    marginBottom: 2,
+  },
+  forwardUrlText: {
+    fontSize: 12,
+    color: '#FFFFFF',
+    fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
+  },
 });
+
+

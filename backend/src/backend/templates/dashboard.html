@@ -1,0 +1,1358 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Screenalyze Studio — Forwarded Analysis & MCP Workflow Hub</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg-base: #06080F;
+      --bg-surface: #0E1322;
+      --bg-surface-elevated: #151D33;
+      --bg-glass: rgba(14, 19, 34, 0.78);
+      --border-subtle: rgba(255, 255, 255, 0.08);
+      --border-bright: rgba(0, 240, 255, 0.3);
+      --text-main: #F3F4F6;
+      --text-secondary: #94A3B8;
+      --text-muted: #64748B;
+      --accent-cyan: #00F0FF;
+      --accent-purple: #8B5CF6;
+      --accent-emerald: #10B981;
+      --accent-amber: #F59E0B;
+      --accent-rose: #F43F5E;
+      --gradient-glow: linear-gradient(135deg, rgba(0, 240, 255, 0.15), rgba(139, 92, 246, 0.15));
+      --radius-sm: 8px;
+      --radius-md: 14px;
+      --radius-lg: 20px;
+      --shadow-glow: 0 0 25px rgba(0, 240, 255, 0.18);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background-color: var(--bg-base);
+      color: var(--text-main);
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow-x: hidden;
+      line-height: 1.5;
+    }
+
+    /* Ambient background lights */
+    .ambient-glow-1 {
+      position: fixed;
+      top: -120px;
+      left: 15%;
+      width: 500px;
+      height: 500px;
+      background: radial-gradient(circle, rgba(0, 240, 255, 0.12) 0%, transparent 70%);
+      pointer-events: none;
+      z-index: 0;
+    }
+    .ambient-glow-2 {
+      position: fixed;
+      bottom: -150px;
+      right: 10%;
+      width: 600px;
+      height: 600px;
+      background: radial-gradient(circle, rgba(139, 92, 246, 0.12) 0%, transparent 70%);
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    /* Header */
+    header {
+      position: sticky;
+      top: 0;
+      z-index: 40;
+      backdrop-filter: blur(20px);
+      background: var(--bg-glass);
+      border-bottom: 1px solid var(--border-subtle);
+      padding: 14px 28px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .brand-wrap {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      text-decoration: none;
+    }
+    .brand-icon {
+      width: 36px;
+      height: 36px;
+      border-radius: 10px;
+      background: linear-gradient(135deg, #00F0FF 0%, #8B5CF6 100%);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 0 16px rgba(0, 240, 255, 0.4);
+      font-size: 18px;
+    }
+    .brand-title {
+      font-size: 18px;
+      font-weight: 700;
+      letter-spacing: -0.5px;
+      color: #FFF;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .brand-badge {
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      background: rgba(0, 240, 255, 0.12);
+      color: var(--accent-cyan);
+      border: 1px solid rgba(0, 240, 255, 0.3);
+      padding: 3px 8px;
+      border-radius: 999px;
+      font-weight: 700;
+    }
+
+    .session-status-bar {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+    .status-pill {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: rgba(16, 185, 129, 0.1);
+      border: 1px solid rgba(16, 185, 129, 0.25);
+      color: #34D399;
+      font-size: 12px;
+      font-weight: 600;
+      padding: 6px 14px;
+      border-radius: 999px;
+    }
+    .pulse-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #10B981;
+      box-shadow: 0 0 8px #10B981;
+      animation: pulse 2s infinite;
+    }
+    @keyframes pulse {
+      0% { transform: scale(0.95); opacity: 0.8; }
+      50% { transform: scale(1.3); opacity: 1; }
+      100% { transform: scale(0.95); opacity: 0.8; }
+    }
+
+    .session-id-pill {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12px;
+      background: var(--bg-surface-elevated);
+      border: 1px solid var(--border-subtle);
+      color: var(--text-secondary);
+      padding: 6px 12px;
+      border-radius: var(--radius-sm);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .session-id-pill:hover {
+      border-color: var(--accent-cyan);
+      color: var(--text-main);
+    }
+
+    /* Main Container Grid */
+    main {
+      position: relative;
+      z-index: 10;
+      flex: 1;
+      padding: 24px 28px;
+      display: grid;
+      grid-template-columns: 360px 1fr 380px;
+      gap: 24px;
+      max-width: 1720px;
+      margin: 0 auto;
+      width: 100%;
+    }
+
+    @media (max-width: 1280px) {
+      main {
+        grid-template-columns: 340px 1fr;
+      }
+      .col-workflows {
+        grid-column: span 2;
+      }
+    }
+    @media (max-width: 900px) {
+      main {
+        grid-template-columns: 1fr;
+      }
+      .col-workflows {
+        grid-column: span 1;
+      }
+    }
+
+    /* Column Cards */
+    .glass-card {
+      background: var(--bg-surface);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-md);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+      position: relative;
+    }
+    .glass-card::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 2px;
+      background: linear-gradient(90deg, transparent, rgba(0, 240, 255, 0.3), transparent);
+    }
+
+    .card-header {
+      padding: 16px 20px;
+      border-bottom: 1px solid var(--border-subtle);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: rgba(255, 255, 255, 0.02);
+    }
+    .card-header h2 {
+      font-size: 14px;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+      color: var(--text-secondary);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .card-body {
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      overflow-y: auto;
+    }
+
+    /* Screenshot Preview Section */
+    .screenshot-viewer-wrap {
+      width: 100%;
+      height: 240px;
+      border-radius: var(--radius-sm);
+      overflow: hidden;
+      background: #000;
+      border: 1px solid var(--border-subtle);
+      position: relative;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+    }
+    .screenshot-img {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      transition: transform 0.3s;
+    }
+    .screenshot-viewer-wrap:hover .screenshot-img {
+      transform: scale(1.03);
+    }
+    .zoom-hint {
+      position: absolute;
+      bottom: 8px;
+      right: 8px;
+      background: rgba(0,0,0,0.7);
+      font-size: 11px;
+      padding: 4px 8px;
+      border-radius: 4px;
+      color: #CBD5E1;
+      pointer-events: none;
+    }
+
+    .meta-tag-group {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+    .category-badge {
+      background: rgba(139, 92, 246, 0.15);
+      border: 1px solid rgba(139, 92, 246, 0.35);
+      color: #C4B5FD;
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      padding: 4px 10px;
+      border-radius: 999px;
+    }
+    .platform-badge {
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid var(--border-subtle);
+      color: var(--text-secondary);
+      font-size: 11px;
+      padding: 4px 10px;
+      border-radius: 999px;
+    }
+
+    .context-block {
+      background: var(--bg-surface-elevated);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-sm);
+      padding: 14px;
+    }
+    .context-block h3 {
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: var(--accent-cyan);
+      margin-bottom: 8px;
+    }
+    .context-block p {
+      font-size: 13px;
+      color: var(--text-main);
+      line-height: 1.6;
+    }
+
+    .key-points-list {
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .key-points-list li {
+      font-size: 12px;
+      color: #CBD5E1;
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      line-height: 1.5;
+    }
+    .key-points-list li::before {
+      content: '▹';
+      color: var(--accent-cyan);
+      font-weight: bold;
+    }
+
+    /* Follow Up Suggestions Pills */
+    .follow-ups-group {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .follow-up-btn {
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-sm);
+      padding: 8px 12px;
+      color: #94A3B8;
+      font-size: 12px;
+      text-align: left;
+      cursor: pointer;
+      transition: all 0.2s;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .follow-up-btn:hover {
+      background: rgba(0, 240, 255, 0.08);
+      border-color: rgba(0, 240, 255, 0.3);
+      color: #FFF;
+      transform: translateX(3px);
+    }
+
+    /* Center Column: Interactive Analysation Engine */
+    .engine-quick-actions {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 10px;
+    }
+    .quick-action-card {
+      background: var(--bg-surface-elevated);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-sm);
+      padding: 12px;
+      cursor: pointer;
+      transition: all 0.2s;
+      text-align: left;
+    }
+    .quick-action-card:hover {
+      border-color: var(--accent-cyan);
+      box-shadow: 0 0 15px rgba(0, 240, 255, 0.15);
+      transform: translateY(-2px);
+    }
+    .qa-icon {
+      font-size: 18px;
+      margin-bottom: 6px;
+    }
+    .qa-title {
+      font-size: 12px;
+      font-weight: 600;
+      color: #FFF;
+      margin-bottom: 3px;
+    }
+    .qa-desc {
+      font-size: 11px;
+      color: var(--text-muted);
+    }
+
+    /* Output Display Area */
+    .engine-stream-view {
+      background: #090D18;
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-sm);
+      padding: 20px;
+      min-height: 380px;
+      max-height: 540px;
+      overflow-y: auto;
+      font-size: 14px;
+      line-height: 1.7;
+      color: #E2E8F0;
+    }
+    .engine-stream-view h1, .engine-stream-view h2, .engine-stream-view h3 {
+      color: #FFF;
+      margin: 16px 0 8px 0;
+      letter-spacing: -0.3px;
+    }
+    .engine-stream-view h1 { font-size: 18px; border-bottom: 1px solid var(--border-subtle); padding-bottom: 8px; }
+    .engine-stream-view h2 { font-size: 16px; color: var(--accent-cyan); }
+    .engine-stream-view h3 { font-size: 14px; color: #A7F3D0; }
+    .engine-stream-view p { margin-bottom: 12px; }
+    .engine-stream-view ul, .engine-stream-view ol { margin-left: 20px; margin-bottom: 12px; }
+    .engine-stream-view pre {
+      background: #04060A;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 8px;
+      padding: 14px;
+      overflow-x: auto;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12px;
+      color: #38BDF8;
+      margin: 14px 0;
+      position: relative;
+    }
+    .engine-stream-view code {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12px;
+      background: rgba(255, 255, 255, 0.08);
+      padding: 2px 6px;
+      border-radius: 4px;
+      color: #F472B6;
+    }
+    .engine-stream-view pre code {
+      background: none;
+      padding: 0;
+      color: inherit;
+    }
+
+    /* Interactive Prompt Input Box */
+    .prompt-composer {
+      display: flex;
+      gap: 10px;
+      background: var(--bg-surface-elevated);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-md);
+      padding: 8px 12px;
+      transition: border-color 0.2s;
+    }
+    .prompt-composer:focus-within {
+      border-color: var(--accent-cyan);
+      box-shadow: 0 0 15px rgba(0, 240, 255, 0.2);
+    }
+    .prompt-input {
+      flex: 1;
+      background: transparent;
+      border: none;
+      outline: none;
+      color: #FFF;
+      font-family: inherit;
+      font-size: 14px;
+      resize: none;
+      min-height: 24px;
+      max-height: 120px;
+    }
+    .prompt-input::placeholder {
+      color: var(--text-muted);
+    }
+    .prompt-submit-btn {
+      background: linear-gradient(135deg, #00F0FF 0%, #8B5CF6 100%);
+      border: none;
+      color: #000;
+      font-weight: 700;
+      font-size: 13px;
+      padding: 8px 18px;
+      border-radius: var(--radius-sm);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.2s;
+    }
+    .prompt-submit-btn:hover {
+      opacity: 0.9;
+      transform: translateY(-1px);
+      box-shadow: 0 0 15px rgba(0, 240, 255, 0.4);
+    }
+    .prompt-submit-btn:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+      transform: none;
+      box-shadow: none;
+    }
+
+    /* Right Column: Workflow Suggestions & MCP Integrations */
+    .tab-nav {
+      display: flex;
+      border-bottom: 1px solid var(--border-subtle);
+      padding: 0 12px;
+      gap: 8px;
+    }
+    .tab-btn {
+      background: none;
+      border: none;
+      color: var(--text-muted);
+      font-weight: 600;
+      font-size: 13px;
+      padding: 12px 14px;
+      cursor: pointer;
+      border-bottom: 2px solid transparent;
+      transition: all 0.2s;
+    }
+    .tab-btn.active {
+      color: var(--accent-cyan);
+      border-bottom-color: var(--accent-cyan);
+    }
+    .tab-btn:hover {
+      color: var(--text-main);
+    }
+
+    /* Workflow Cards */
+    .workflow-item-card {
+      background: var(--bg-surface-elevated);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-sm);
+      padding: 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      transition: all 0.2s;
+    }
+    .workflow-item-card:hover {
+      border-color: rgba(0, 240, 255, 0.3);
+      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+    }
+    .wf-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .wf-badge {
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+      background: rgba(0, 240, 255, 0.1);
+      color: var(--accent-cyan);
+      padding: 2px 8px;
+      border-radius: 4px;
+    }
+    .wf-integration {
+      font-size: 11px;
+      color: var(--accent-purple);
+      font-weight: 600;
+    }
+    .wf-title {
+      font-size: 13px;
+      font-weight: 600;
+      color: #FFF;
+    }
+    .wf-desc {
+      font-size: 11px;
+      color: var(--text-secondary);
+      line-height: 1.5;
+    }
+    .wf-steps {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      background: rgba(0, 0, 0, 0.25);
+      padding: 8px 10px;
+      border-radius: 6px;
+    }
+    .wf-step {
+      font-size: 11px;
+      color: #94A3B8;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .wf-step::before {
+      content: '•';
+      color: var(--accent-cyan);
+    }
+    .wf-run-btn {
+      background: rgba(0, 240, 255, 0.12);
+      border: 1px solid rgba(0, 240, 255, 0.3);
+      color: var(--accent-cyan);
+      font-size: 12px;
+      font-weight: 600;
+      padding: 8px 14px;
+      border-radius: 6px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      transition: all 0.2s;
+    }
+    .wf-run-btn:hover {
+      background: var(--accent-cyan);
+      color: #000;
+      box-shadow: 0 0 12px rgba(0, 240, 255, 0.4);
+    }
+
+    /* MCP Hub Cards */
+    .mcp-server-card {
+      background: var(--bg-surface-elevated);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-sm);
+      padding: 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .mcp-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .mcp-name {
+      font-size: 13px;
+      font-weight: 600;
+      color: #FFF;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .mcp-indicator {
+      font-size: 11px;
+      padding: 2px 8px;
+      border-radius: 999px;
+      background: rgba(16, 185, 129, 0.15);
+      color: #34D399;
+      border: 1px solid rgba(16, 185, 129, 0.3);
+      font-weight: 600;
+    }
+    .mcp-tools {
+      font-size: 11px;
+      color: var(--text-muted);
+      font-family: 'JetBrains Mono', monospace;
+    }
+    .mcp-exec-btn {
+      background: rgba(139, 92, 246, 0.15);
+      border: 1px solid rgba(139, 92, 246, 0.35);
+      color: #C4B5FD;
+      font-size: 11px;
+      font-weight: 600;
+      padding: 6px 10px;
+      border-radius: 4px;
+      cursor: pointer;
+      transition: all 0.2s;
+      text-align: center;
+    }
+    .mcp-exec-btn:hover {
+      background: var(--accent-purple);
+      color: #FFF;
+      box-shadow: 0 0 10px rgba(139, 92, 246, 0.4);
+    }
+
+    /* Modal for Image Fullscreen and Workflow Output */
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.85);
+      backdrop-filter: blur(8px);
+      z-index: 100;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+    }
+    .modal-overlay.open {
+      display: flex;
+    }
+    .modal-content {
+      background: var(--bg-surface);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-lg);
+      max-width: 900px;
+      width: 100%;
+      max-height: 85vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      box-shadow: 0 20px 50px rgba(0,0,0,0.7);
+    }
+    .modal-header {
+      padding: 16px 24px;
+      border-bottom: 1px solid var(--border-subtle);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .modal-header h3 {
+      font-size: 16px;
+      color: #FFF;
+      font-weight: 700;
+    }
+    .modal-close-btn {
+      background: none;
+      border: none;
+      color: var(--text-muted);
+      font-size: 20px;
+      cursor: pointer;
+    }
+    .modal-body {
+      padding: 24px;
+      overflow-y: auto;
+      font-size: 14px;
+      line-height: 1.6;
+    }
+
+    /* Toast Notification */
+    .toast-container {
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      z-index: 200;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .toast {
+      background: var(--bg-surface-elevated);
+      border: 1px solid var(--accent-cyan);
+      box-shadow: 0 0 15px rgba(0, 240, 255, 0.25);
+      color: #FFF;
+      font-size: 13px;
+      padding: 12px 18px;
+      border-radius: var(--radius-sm);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      animation: slideIn 0.3s forwards;
+    }
+    @keyframes slideIn {
+      from { transform: translateY(20px); opacity: 0; }
+      to { transform: translateY(0); opacity: 1; }
+    }
+
+    /* Loading Shimmer */
+    .shimmer {
+      background: linear-gradient(90deg, rgba(255,255,255,0.03) 0%, rgba(255,255,255,0.08) 50%, rgba(255,255,255,0.03) 100%);
+      background-size: 200% 100%;
+      animation: shimmer 1.5s infinite;
+    }
+    @keyframes shimmer {
+      0% { background-position: -200% 0; }
+      100% { background-position: 200% 0; }
+    }
+  </style>
+</head>
+<body>
+  <div class="ambient-glow-1"></div>
+  <div class="ambient-glow-2"></div>
+
+  <!-- Header -->
+  <header>
+    <a href="/dashboard" class="brand-wrap">
+      <div class="brand-icon">⚡</div>
+      <div class="brand-title">
+        Screenalyze Studio
+        <span class="brand-badge">MCP Engine</span>
+      </div>
+    </a>
+
+    <div class="session-status-bar">
+      <div class="status-pill" id="sessionStatusPill">
+        <span class="pulse-dot"></span>
+        <span id="sessionStatusText">Live Session Active</span>
+      </div>
+
+      <div class="session-id-pill" id="sessionIdBtn" onclick="copySessionId()" title="Click to copy Session ID">
+        <span>ID:</span>
+        <span id="sessionIdLabel">Connecting...</span>
+        <span>📋</span>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Grid -->
+  <main>
+    <!-- Left Column: Forwarded Screenshot Context -->
+    <section class="glass-card">
+      <div class="card-header">
+        <h2><span>📷</span> Screenshot Context</h2>
+        <span id="screenshotTime" style="font-size: 11px; color: var(--text-muted);">Realtime</span>
+      </div>
+
+      <div class="card-body">
+        <div class="screenshot-viewer-wrap" onclick="openImageModal()">
+          <img id="screenshotImg" class="screenshot-img" src="" alt="Forwarded Screenshot" />
+          <div class="zoom-hint">🔍 Click to zoom</div>
+        </div>
+
+        <div class="meta-tag-group">
+          <span class="category-badge" id="categoryBadge">Processing</span>
+          <span class="platform-badge" id="platformBadge">Forwarded via Mobile</span>
+        </div>
+
+        <div class="context-block">
+          <h3 id="screenshotTitle">Detecting analysis...</h3>
+          <p id="screenshotSummary">Connecting to Screenalyze backend session store. The forwarded image insights will populate shortly.</p>
+        </div>
+
+        <div class="context-block">
+          <h3>Key Concepts & Architecture</h3>
+          <ul class="key-points-list" id="keyPointsList">
+            <li>Loading session context...</li>
+          </ul>
+        </div>
+
+        <div class="context-block">
+          <h3>Interactive Inquiries</h3>
+          <div class="follow-ups-group" id="followUpsGroup">
+            <!-- Dynamically injected pills -->
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Center Column: Analysation Engine & Prompt Execution -->
+    <section class="glass-card">
+      <div class="card-header">
+        <h2><span>⚡</span> Analysation Engine</h2>
+        <span style="font-size: 11px; color: var(--accent-cyan); font-weight: 600;">GPT-4o Multimodal Vision</span>
+      </div>
+
+      <div class="card-body">
+        <!-- Quick Action Triggers -->
+        <div class="engine-quick-actions">
+          <div class="quick-action-card" onclick="runAction('create_tutorial')">
+            <div class="qa-icon">📘</div>
+            <div class="qa-title">Masterclass Tutorial</div>
+            <div class="qa-desc">Step-by-step implementation guide</div>
+          </div>
+          <div class="quick-action-card" onclick="runAction('explain_tutorial')">
+            <div class="qa-icon">💡</div>
+            <div class="qa-title">Architectural Deep-Dive</div>
+            <div class="qa-desc">Component trade-offs and rationale</div>
+          </div>
+          <div class="quick-action-card" onclick="runAction('extract_diagram')">
+            <div class="qa-icon">🏗️</div>
+            <div class="qa-title">System ASCII Topology</div>
+            <div class="qa-desc">ASCII data flow & cloud boundaries</div>
+          </div>
+          <div class="quick-action-card" onclick="runAction('audit_security')">
+            <div class="qa-icon">🛡️</div>
+            <div class="qa-title">Security & Edge Cases</div>
+            <div class="qa-desc">Threat audit and bottleneck analysis</div>
+          </div>
+        </div>
+
+        <!-- Live Output View Area -->
+        <div class="engine-stream-view" id="engineStreamView">
+          <h1 id="streamOutputTitle">Screenalyze Session Active</h1>
+          <div id="streamOutputContent">
+            <p>Welcome to the <strong>Screenalyze Web Dashboard</strong>. This session is linked to your mobile app forwarder.</p>
+            <p>The screenshot and its synthesized prompt have been forwarded to this dedicated workbench. You can now:</p>
+            <ul>
+              <li>Execute custom prompts directly on this screenshot with full GPT-4o multimodal vision.</li>
+              <li>Trigger one-click workflow pipelines (GitHub PRs, Terraform, Slack broadcasts).</li>
+              <li>Connect to MCP (Model Context Protocol) servers to relay this visual context into agent tools.</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- Prompt Composer -->
+        <div class="prompt-composer">
+          <textarea
+            id="promptInput"
+            class="prompt-input"
+            rows="1"
+            placeholder="Ask Screenalyze or execute a prompt on this screenshot... (Enter to send)"
+            onkeydown="handlePromptKeyDown(event)"
+          ></textarea>
+          <button class="prompt-submit-btn" id="submitPromptBtn" onclick="submitCustomPrompt()">
+            <span>Run</span>
+            <span>↵</span>
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- Right Column: Workflow Suggestions & MCP Integrations -->
+    <section class="glass-card col-workflows">
+      <div class="card-header" style="padding-bottom: 0;">
+        <div class="tab-nav">
+          <button class="tab-btn active" id="tabBtnWorkflows" onclick="switchTab('workflows')">Suggested Workflows</button>
+          <button class="tab-btn" id="tabBtnMCP" onclick="switchTab('mcp')">MCP & Integrations</button>
+        </div>
+      </div>
+
+      <div class="card-body">
+        <!-- Workflows Tab -->
+        <div id="tabContentWorkflows" style="display: flex; flex-direction: column; gap: 14px;">
+          <div id="workflowsList">
+            <!-- Dynamically populated workflow suggestion cards -->
+            <div class="workflow-item-card shimmer" style="height: 120px;"></div>
+            <div class="workflow-item-card shimmer" style="height: 120px;"></div>
+          </div>
+        </div>
+
+        <!-- MCP Tab -->
+        <div id="tabContentMCP" style="display: none; flex-direction: column; gap: 14px;">
+          <div class="context-block" style="background: rgba(139, 92, 246, 0.08); border-color: rgba(139, 92, 246, 0.25);">
+            <h3 style="color: var(--accent-purple);">Model Context Protocol Hub</h3>
+            <p style="font-size: 12px; color: #CBD5E1;">
+              Connect your local agents (Claude, Cursor, sidecars) to Screenalyze via standard MCP stdio/SSE protocol to query this forwarded screenshot.
+            </p>
+          </div>
+
+          <!-- MCP Servers -->
+          <div class="mcp-server-card">
+            <div class="mcp-header">
+              <span class="mcp-name">🐙 GitHub MCP Server</span>
+              <span class="mcp-indicator">Ready</span>
+            </div>
+            <div class="mcp-tools">Tools: create_pr, create_issue, query_repo</div>
+            <button class="mcp-exec-btn" onclick="triggerMcpTool('github-mcp', 'create_issue')">Dispatch Issue to GitHub</button>
+          </div>
+
+          <div class="mcp-server-card">
+            <div class="mcp-header">
+              <span class="mcp-name">💬 Slack MCP Server</span>
+              <span class="mcp-indicator">Ready</span>
+            </div>
+            <div class="mcp-tools">Tools: send_summary, broadcast_channel</div>
+            <button class="mcp-exec-btn" onclick="triggerMcpTool('slack-mcp', 'send_summary')">Send Summary to Slack</button>
+          </div>
+
+          <div class="mcp-server-card">
+            <div class="mcp-header">
+              <span class="mcp-name">📝 Notion MCP Server</span>
+              <span class="mcp-indicator">Ready</span>
+            </div>
+            <div class="mcp-tools">Tools: append_page, sync_database</div>
+            <button class="mcp-exec-btn" onclick="triggerMcpTool('notion-mcp', 'append_page')">Sync Page in Notion</button>
+          </div>
+
+          <div class="mcp-server-card">
+            <div class="mcp-header">
+              <span class="mcp-name">📁 Filesystem MCP Server</span>
+              <span class="mcp-indicator">Ready</span>
+            </div>
+            <div class="mcp-tools">Tools: write_spec, export_markdown</div>
+            <button class="mcp-exec-btn" onclick="triggerMcpTool('filesystem-mcp', 'write_spec')">Write Markdown to Local Repo</button>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- Modal for Fullscreen Image & Workflow Output -->
+  <div class="modal-overlay" id="genericModal" onclick="closeModalOnOverlay(event)">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3 id="modalTitle">Modal Preview</h3>
+        <button class="modal-close-btn" onclick="closeModal()">✕</button>
+      </div>
+      <div class="modal-body" id="modalBody"></div>
+    </div>
+  </div>
+
+  <!-- Toast Notification Container -->
+  <div class="toast-container" id="toastContainer"></div>
+
+  <!-- JavaScript Client -->
+  <script>
+    // State
+    let currentSessionId = new URLSearchParams(window.location.search).get('session') || '';
+    let sessionData = null;
+    let isExecuting = false;
+
+    // Toast helper
+    function showToast(message, icon = '🚀') {
+      const container = document.getElementById('toastContainer');
+      const toast = document.createElement('div');
+      toast.className = 'toast';
+      toast.innerHTML = `<span>${icon}</span> <span>${message}</span>`;
+      container.appendChild(toast);
+      setTimeout(() => {
+        toast.style.opacity = '0';
+        toast.style.transform = 'translateY(10px)';
+        setTimeout(() => toast.remove(), 300);
+      }, 3500);
+    }
+
+    // Copy Session ID
+    function copySessionId() {
+      if (!currentSessionId) return;
+      navigator.clipboard.writeText(window.location.href);
+      showToast('Dashboard URL copied to clipboard!', '📋');
+    }
+
+    // Modal helpers
+    function openImageModal() {
+      const img = document.getElementById('screenshotImg');
+      if (!img.src) return;
+      document.getElementById('modalTitle').textContent = sessionData?.title || 'Screenshot Preview';
+      document.getElementById('modalBody').innerHTML = `
+        <div style="display:flex; justify-content:center; align-items:center;">
+          <img src="${img.src}" style="max-width:100%; max-height:75vh; border-radius:8px; object-fit:contain; border:1px solid var(--border-subtle);" />
+        </div>
+      `;
+      document.getElementById('genericModal').classList.add('open');
+    }
+
+    function closeModal() {
+      document.getElementById('genericModal').classList.remove('open');
+    }
+
+    function closeModalOnOverlay(e) {
+      if (e.target.id === 'genericModal') closeModal();
+    }
+
+    // Tab switcher
+    function switchTab(tab) {
+      const tabWorkflows = document.getElementById('tabContentWorkflows');
+      const tabMCP = document.getElementById('tabContentMCP');
+      const btnWorkflows = document.getElementById('tabBtnWorkflows');
+      const btnMCP = document.getElementById('tabBtnMCP');
+
+      if (tab === 'workflows') {
+        tabWorkflows.style.display = 'flex';
+        tabMCP.style.display = 'none';
+        btnWorkflows.classList.add('active');
+        btnMCP.classList.remove('active');
+      } else {
+        tabWorkflows.style.display = 'none';
+        tabMCP.style.display = 'flex';
+        btnWorkflows.classList.remove('active');
+        btnMCP.classList.add('active');
+      }
+    }
+
+    // Fetch session data
+    async function loadSession() {
+      if (!currentSessionId) {
+        document.getElementById('sessionIdLabel').textContent = 'No active session';
+        document.getElementById('screenshotTitle').textContent = 'Ready for Forwarding';
+        document.getElementById('screenshotSummary').textContent = 'Please tap the Share button in the Screenalyze mobile app to forward a screenshot session, or pass ?session=ID in the URL.';
+        return;
+      }
+
+      document.getElementById('sessionIdLabel').textContent = currentSessionId.slice(0, 14) + '...';
+
+      try {
+        const res = await fetch(`/api/v1/sessions/${currentSessionId}`);
+        if (!res.ok) throw new Error('Session not found');
+        sessionData = await res.json();
+        renderSession(sessionData);
+        loadWorkflowSuggestions();
+      } catch (err) {
+        console.error('Failed to load session:', err);
+        document.getElementById('sessionStatusPill').style.background = 'rgba(244, 63, 94, 0.15)';
+        document.getElementById('sessionStatusText').textContent = 'Session Disconnected';
+        showToast('Could not load session ' + currentSessionId, '⚠️');
+      }
+    }
+
+    function renderSession(data) {
+      document.getElementById('sessionStatusText').textContent = 'Live Session Active';
+      document.getElementById('screenshotTitle').textContent = data.title || 'Forwarded Screenshot';
+      document.getElementById('screenshotSummary').textContent = data.summary || 'No summary available.';
+      document.getElementById('categoryBadge').textContent = (data.category || 'ANALYSIS').toUpperCase();
+
+      // Format timestamp
+      if (data.created_at) {
+        const d = new Date(data.created_at);
+        document.getElementById('screenshotTime').textContent = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      }
+
+      // Image
+      const img = document.getElementById('screenshotImg');
+      if (data.image_base64) {
+        img.src = data.image_base64.startsWith('data:') ? data.image_base64 : `data:image/jpeg;base64,${data.image_base64}`;
+      } else if (data.image_url) {
+        img.src = data.image_url;
+      } else {
+        img.src = 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="300" height="200" viewBox="0 0 300 200"><rect width="100%" height="100%" fill="%230E1322"/><text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle" fill="%2364748B" font-family="sans-serif" font-size="14">Image Synced in Session</text></svg>';
+      }
+
+      // Key points
+      const kpList = document.getElementById('keyPointsList');
+      kpList.innerHTML = '';
+      if (data.key_points && data.key_points.length > 0) {
+        data.key_points.forEach(pt => {
+          const li = document.createElement('li');
+          li.textContent = pt;
+          kpList.appendChild(li);
+        });
+      } else {
+        kpList.innerHTML = '<li>Direct visual insights extracted</li>';
+      }
+
+      // Follow-up inquiry buttons
+      const followUpsContainer = document.getElementById('followUpsGroup');
+      followUpsContainer.innerHTML = '';
+      const questions = data.follow_up_questions || [
+        'How can this architecture scale horizontally?',
+        'What are the edge case failure modes?',
+        'Generate an implementation test suite.'
+      ];
+
+      questions.forEach(q => {
+        const btn = document.createElement('button');
+        btn.className = 'follow-up-btn';
+        btn.innerHTML = `<span>${q}</span><span>→</span>`;
+        btn.onclick = () => {
+          document.getElementById('promptInput').value = q;
+          submitCustomPrompt();
+        };
+        followUpsContainer.appendChild(btn);
+      });
+
+      // Populate stream output if chat history exists
+      if (data.chat_history && data.chat_history.length > 0) {
+        const lastAssistant = [...data.chat_history].reverse().find(m => m.sender === 'assistant' && m.text);
+        if (lastAssistant) {
+          document.getElementById('streamOutputTitle').textContent = lastAssistant.title || data.title;
+          document.getElementById('streamOutputContent').innerHTML = renderMarkdown(lastAssistant.text);
+        }
+      }
+    }
+
+    // Load Workflow Suggestions
+    async function loadWorkflowSuggestions() {
+      if (!currentSessionId) return;
+      try {
+        const res = await fetch(`/api/v1/sessions/${currentSessionId}/workflows`);
+        if (!res.ok) return;
+        const workflows = await res.json();
+        const container = document.getElementById('workflowsList');
+        container.innerHTML = '';
+
+        workflows.forEach(wf => {
+          const card = document.createElement('div');
+          card.className = 'workflow-item-card';
+          card.innerHTML = `
+            <div class="wf-top">
+              <span class="wf-badge">${wf.badge}</span>
+              <span class="wf-integration">${wf.target_integration}</span>
+            </div>
+            <div class="wf-title">${wf.title}</div>
+            <div class="wf-desc">${wf.description}</div>
+            <div class="wf-steps">
+              ${wf.steps.map(s => `<div class="wf-step">${s}</div>`).join('')}
+            </div>
+            <button class="wf-run-btn" onclick="executeWorkflow('${wf.id}', '${wf.title}')">
+              <span>⚡ Run Workflow</span>
+            </button>
+          `;
+          container.appendChild(card);
+        });
+      } catch (err) {
+        console.error('Error fetching workflows:', err);
+      }
+    }
+
+    // Run custom prompt
+    async function submitCustomPrompt() {
+      const input = document.getElementById('promptInput');
+      const text = input.value.trim();
+      if (!text || isExecuting) return;
+
+      isExecuting = true;
+      const btn = document.getElementById('submitPromptBtn');
+      btn.disabled = true;
+      btn.innerHTML = '<span>Running...</span>';
+
+      document.getElementById('streamOutputTitle').textContent = text;
+      document.getElementById('streamOutputContent').innerHTML = `
+        <div style="display:flex; align-items:center; gap:10px; color:var(--accent-cyan);">
+          <div class="pulse-dot"></div>
+          <span>Screenalyze GPT-4o engine is analyzing visual context & synthesizing response...</span>
+        </div>
+      `;
+
+      try {
+        const res = await fetch(`/api/v1/sessions/${currentSessionId}/prompt`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ prompt: text, action_type: 'prompt' })
+        });
+
+        if (!res.ok) throw new Error('Action failed');
+        const data = await res.json();
+
+        document.getElementById('streamOutputTitle').textContent = data.title || text;
+        document.getElementById('streamOutputContent').innerHTML = renderMarkdown(data.content);
+        input.value = '';
+        showToast('Engine completed analysis!', '✨');
+      } catch (err) {
+        console.error(err);
+        document.getElementById('streamOutputContent').innerHTML = `<p style="color:var(--accent-rose);">Execution error: ${err.message}</p>`;
+      } finally {
+        isExecuting = false;
+        btn.disabled = false;
+        btn.innerHTML = '<span>Run</span><span>↵</span>';
+      }
+    }
+
+    function handlePromptKeyDown(e) {
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        submitCustomPrompt();
+      }
+    }
+
+    // Quick action trigger
+    function runAction(actionType) {
+      const prompts = {
+        'create_tutorial': 'Generate a comprehensive, hands-on masterclass tutorial implementing the concepts in this screenshot.',
+        'explain_tutorial': 'Provide an architectural deep-dive into the rationale, tradeoffs, and system mechanics of this screenshot.',
+        'extract_diagram': 'Extract the system architecture topology and render clean ASCII dataflow diagrams with network boundaries.',
+        'audit_security': 'Perform a comprehensive security audit, bottleneck assessment, and edge-case failure mode analysis for this design.'
+      };
+      const p = prompts[actionType] || actionType;
+      document.getElementById('promptInput').value = p;
+      submitCustomPrompt();
+    }
+
+    // Run Workflow execution
+    async function executeWorkflow(workflowId, workflowTitle) {
+      showToast(`Initiating workflow: ${workflowTitle}`, '⚡');
+
+      document.getElementById('modalTitle').textContent = `Running: ${workflowTitle}`;
+      document.getElementById('modalBody').innerHTML = `
+        <div style="display:flex; flex-direction:column; gap:14px;">
+          <div style="display:flex; align-items:center; gap:10px; color:var(--accent-cyan);">
+            <div class="pulse-dot"></div>
+            <span>Executing pipeline stages & synthesizing artifacts...</span>
+          </div>
+          <div id="modalWfLogs" style="background:#05070D; border:1px solid var(--border-subtle); border-radius:8px; padding:12px; font-family:'JetBrains Mono', monospace; font-size:11px; color:#38BDF8; max-height:180px; overflow-y:auto;">
+            [INIT] Starting pipeline runner...<br>
+            [CONTEXT] Forwarded screenshot context verified.<br>
+            [MCP] Synthesizing target integration payload...
+          </div>
+        </div>
+      `;
+      document.getElementById('genericModal').classList.add('open');
+
+      try {
+        const res = await fetch(`/api/v1/sessions/${currentSessionId}/workflows/run`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ workflow_id: workflowId })
+        });
+
+        if (!res.ok) throw new Error('Workflow failed');
+        const result = await res.json();
+
+        const logsHtml = result.logs.map(l => `<div>${l}</div>`).join('');
+        const artifactHtml = result.artifacts && result.artifacts.length > 0 ? renderMarkdown(result.artifacts[0].content) : '<p>Workflow completed.</p>';
+
+        document.getElementById('modalBody').innerHTML = `
+          <div style="display:flex; flex-direction:column; gap:16px;">
+            <div style="background:#05070D; border:1px solid var(--border-subtle); border-radius:8px; padding:12px; font-family:'JetBrains Mono', monospace; font-size:11px; color:#38BDF8; max-height:130px; overflow-y:auto;">
+              ${logsHtml}
+            </div>
+            <div style="background:var(--bg-surface-elevated); border:1px solid var(--border-subtle); border-radius:8px; padding:16px; max-height:400px; overflow-y:auto;">
+              ${artifactHtml}
+            </div>
+          </div>
+        `;
+
+        showToast('Workflow executed successfully!', '🎉');
+      } catch (err) {
+        document.getElementById('modalBody').innerHTML = `<p style="color:var(--accent-rose);">Workflow failed: ${err.message}</p>`;
+      }
+    }
+
+    // Trigger MCP Tool Call
+    async function triggerMcpTool(serverId, toolName) {
+      showToast(`Invoking MCP: ${serverId}/${toolName}`, '🔌');
+      try {
+        const res = await fetch(`/api/v1/sessions/${currentSessionId}/mcp/execute`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ server_id: serverId, tool_name: toolName, parameters: { title: sessionData?.title } })
+        });
+
+        const data = await res.json();
+        document.getElementById('modalTitle').textContent = `MCP Tool Execution: ${serverId}/${toolName}`;
+        document.getElementById('modalBody').innerHTML = `
+          <div style="display:flex; flex-direction:column; gap:14px;">
+            <p style="color:var(--accent-emerald); font-weight:600;">${data.message}</p>
+            <pre style="background:#05070D; padding:14px; border-radius:8px; border:1px solid var(--border-subtle); color:#38BDF8; font-family:'JetBrains Mono'; font-size:12px;">${JSON.stringify(data.result, null, 2)}</pre>
+          </div>
+        `;
+        document.getElementById('genericModal').classList.add('open');
+      } catch (err) {
+        showToast('MCP execution error: ' + err.message, '⚠️');
+      }
+    }
+
+    // Simple markdown renderer for code blocks, bold, headers
+    function renderMarkdown(md) {
+      if (!md) return '';
+      let escaped = md
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;');
+
+      // Code blocks
+      escaped = escaped.replace(/```([a-zA-Z0-9_-]*)\n([\s\S]*?)```/g, (m, lang, code) => {
+        return `<pre><code class="lang-${lang}">${code.trim()}</code></pre>`;
+      });
+
+      // Headers
+      escaped = escaped.replace(/^### (.*$)/gim, '<h3>$1</h3>');
+      escaped = escaped.replace(/^## (.*$)/gim, '<h2>$1</h2>');
+      escaped = escaped.replace(/^# (.*$)/gim, '<h1>$1</h1>');
+
+      // Bold & Italic
+      escaped = escaped.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+      escaped = escaped.replace(/\*(.*?)\*/g, '<em>$1</em>');
+
+      // Inline code
+      escaped = escaped.replace(/`([^`]+)`/g, '<code>$1</code>');
+
+      // Lists
+      escaped = escaped.replace(/^\s*-\s+(.*$)/gim, '<li>$1</li>');
+      escaped = escaped.replace(/^\s*\*\s+(.*$)/gim, '<li>$1</li>');
+      escaped = escaped.replace(/^\s*\d+\.\s+(.*$)/gim, '<li>$1</li>');
+
+      // Paragraphs
+      return escaped.replace(/\n\n+/g, '</p><p>').replace(/\n/g, '<br>');
+    }
+
+    // Auto-init
+    window.addEventListener('DOMContentLoaded', loadSession);
+  </script>
+</body>
+</html>

@@ -9,6 +9,7 @@ from .routers import (
     actions_router,
     users_router,
     auth_router,
+    sessions_router,
 )
 
 logging.basicConfig(
@@ -51,6 +52,8 @@ app.include_router(screenshots_router)
 app.include_router(actions_router)
 app.include_router(users_router)
 app.include_router(auth_router)
+app.include_router(sessions_router)
+
 
 @app.get("/health", tags=["System"])
 async def health_check():

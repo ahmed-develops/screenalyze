@@ -54,6 +54,14 @@ export interface BackendActionResponse {
   next_follow_ups: string[];
 }
 
+export interface ForwardSessionResult {
+  sessionId: string;
+  dashboardUrl: string;
+  createdAt: number;
+  status: string;
+  message: string;
+}
+
 export interface BackendAuthResponse {
   success: boolean;
   token: string;
@@ -543,4 +551,56 @@ export const ApiClient = {
       this.setAuthToken(null);
     }
   },
+
+  /**
+   * Forwards a screenshot, prompt, and analysis into a connected live Web Dashboard session
+   */
+  async forwardScreenshotSession(payload: {
+    screenshotId: string;
+    title: string;
+    category?: string;
+    summary?: string;
+    keyPoints?: string[];
+    contextualActions?: any[];
+    followUpQuestions?: string[];
+    generatedContent?: any[];
+    imageBase64?: string;
+    imageUrl?: string;
+    initialPrompt?: string;
+  }): Promise<ForwardSessionResult> {
+    const url = `${this.baseUrl}/api/v1/sessions/forward`;
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: this.getHeaders(),
+      body: JSON.stringify({
+        screenshot_id: payload.screenshotId,
+        title: payload.title,
+        category: payload.category || 'general',
+        summary: payload.summary || '',
+        key_points: payload.keyPoints || [],
+        contextual_actions: payload.contextualActions || [],
+        follow_up_questions: payload.followUpQuestions || [],
+        generated_content: payload.generatedContent || [],
+        image_base64: payload.imageBase64,
+        image_url: payload.imageUrl,
+        initial_prompt: payload.initialPrompt,
+        client_platform: Platform.OS,
+      }),
+    });
+
+    if (!res.ok) {
+      const err = await res.text();
+      throw new Error(`Forwarding session failed (${res.status}): ${err}`);
+    }
+
+    const data = await res.json();
+    return {
+      sessionId: data.session_id,
+      dashboardUrl: data.dashboard_url,
+      createdAt: data.created_at,
+      status: data.status,
+      message: data.message,
+    };
+  },
 };
+

@@ -22,6 +22,8 @@ import {
   HelpCircle,
   ArrowRight,
   BookOpen,
+  Globe,
+  ExternalLink,
 } from 'lucide-react-native';
 import {
   ScreenshotAnalysis,
@@ -31,10 +33,13 @@ import {
 } from '../types';
 import { Colors } from '../theme/colors';
 import { AIService } from '../services/aiService';
+import { ApiClient } from '../services/apiClient';
 import { StorageService } from '../services/storageService';
 import { getFriendlyAnalysisError } from '../utils/errorUtils';
 import * as Sharing from 'expo-sharing';
 import * as Clipboard from 'expo-clipboard';
+import * as Linking from 'expo-linking';
+
 
 interface ActionPickerModalProps {
   visible: boolean;
@@ -125,7 +130,40 @@ export const ActionPickerModal: React.FC<ActionPickerModalProps> = ({
     }
   }, [screenshot]);
 
+  const [isForwarding, setIsForwarding] = useState(false);
+
+  const handleForwardWeb = useCallback(async () => {
+    if (!screenshot || isForwarding) return;
+    setIsForwarding(true);
+    try {
+      const base64 = await AIService.getImageBase64(screenshot.imageUri);
+      const res = await ApiClient.forwardScreenshotSession({
+        screenshotId: screenshot.id,
+        title: screenshot.title,
+        category: screenshot.category,
+        summary: screenshot.summary,
+        keyPoints: screenshot.keyPoints,
+        contextualActions: screenshot.contextualActions,
+        followUpQuestions: screenshot.followUpQuestions,
+        generatedContent: screenshot.generatedContent,
+        imageBase64: base64,
+        imageUrl: screenshot.imageUri,
+        initialPrompt: screenshot.summary,
+      });
+      await Clipboard.setStringAsync(res.dashboardUrl);
+      await Linking.openURL(res.dashboardUrl);
+      onClose();
+    } catch (err) {
+      console.error('Forwarding error:', err);
+      const friendly = getFriendlyAnalysisError(err);
+      Alert.alert(friendly.title, friendly.message);
+    } finally {
+      setIsForwarding(false);
+    }
+  }, [screenshot, isForwarding, onClose]);
+
   if (!screenshot || !visible || !isAppropriateScreenshot(screenshot)) return null;
+
 
   const contextualActions: ContextualAction[] =
     screenshot.contextualActions && screenshot.contextualActions.length > 0
@@ -309,11 +347,30 @@ export const ActionPickerModal: React.FC<ActionPickerModalProps> = ({
               </View>
             </View>
 
+            {/* Forward to Web Dashboard Button */}
+            <TouchableOpacity
+              style={styles.forwardRowBtn}
+              activeOpacity={0.8}
+              onPress={handleForwardWeb}
+              disabled={isForwarding}
+            >
+              <Globe size={16} color="#00F0FF" />
+              <Text style={styles.forwardRowText}>
+                {isForwarding ? 'Forwarding to Web...' : 'Forward to Web Dashboard & MCP Studio'}
+              </Text>
+              {isForwarding ? (
+                <ActivityIndicator size="small" color="#00F0FF" />
+              ) : (
+                <ExternalLink size={14} color="#00F0FF" />
+              )}
+            </TouchableOpacity>
+
             {/* Share button */}
             <TouchableOpacity style={styles.shareRowBtn} activeOpacity={0.8} onPress={handleShare}>
               <Share2 size={16} color={Colors.textSecondary} />
               <Text style={styles.shareRowText}>Share screenshot summary & notes</Text>
             </TouchableOpacity>
+
 
             {copiedNotification && (
               <View style={styles.copiedBanner}>
@@ -577,6 +634,24 @@ const styles = StyleSheet.create({
   sendBtnDisabled: {
     opacity: 0.4,
   },
+  forwardRowBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: 'rgba(0, 240, 255, 0.08)',
+    borderWidth: 1,
+    borderColor: 'rgba(0, 240, 255, 0.25)',
+    borderRadius: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    marginBottom: 10,
+  },
+  forwardRowText: {
+    fontSize: 13,
+    color: '#00F0FF',
+    fontWeight: '700',
+  },
   shareRowBtn: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -585,6 +660,7 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     marginBottom: 20,
   },
+
   shareRowText: {
     fontSize: 13,
     color: Colors.textSecondary,
